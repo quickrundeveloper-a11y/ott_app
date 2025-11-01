@@ -10,6 +10,8 @@ class SampleFile extends StatefulWidget {
 class _SampleFileState extends State<SampleFile> {
   @override
   Widget build(BuildContext context) {
-    return const Placeholder();
+    return Scaffold(
+      backgroundColor: Colors.blue,
+    );
   }
 }
