@@ -1,7 +1,7 @@
    import 'package:flutter/material.dart';
 
-import '../auth_service.dart';
 import 'home_screen.dart';
+import 'login_screen.dart';
 
 class CompleteProfileArgs {
   final String uid;
