@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'choose_interest_page.dart';
+import 'choose_interest.dart';
 
 void main() {
   runApp(const MyApp());
@@ -39,7 +39,7 @@ class HomePage extends StatelessWidget {
           onPressed: () {
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (context) => const ChooseInterestPage()),
+              MaterialPageRoute(builder: (context) => const ChooseInterest()),
             );
           },
           child: const Text(
