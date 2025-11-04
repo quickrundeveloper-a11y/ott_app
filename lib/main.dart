@@ -26,8 +26,7 @@ Future<void> main() async {
       );
     }
   } catch (e) {
-    // show or log if needed, but continue.
-    // print('Firebase init error: $e');
+    // ignore init errors for now (or log them)
   }
 
   runApp(const MyApp());
@@ -40,7 +39,6 @@ class MyApp extends StatefulWidget {
   State<MyApp> createState() => _MyAppState();
 }
 
-/// We'll check SharedPreferences + Firebase to decide the first screen
 class _MyAppState extends State<MyApp> {
   Widget? _startScreen;
 
@@ -51,41 +49,23 @@ class _MyAppState extends State<MyApp> {
   }
 
   Future<void> _decideStartScreen() async {
-    // Default to login while checking
     Widget start = const LoginScreen();
 
     try {
       final prefs = await SharedPreferences.getInstance();
       final saved = prefs.getBool('isLoggedIn') ?? false;
-
       final user = FirebaseAuth.instance.currentUser;
 
-      // If we have a saved flag AND a firebase user (token), prefer that
       if (saved && user != null) {
-        // check if user doc exists in Firestore
         final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-        if (doc.exists) {
-          start = const HomeScreen();
-        } else {
-          start = CompleteProfileScreen(
-            // send args if needed; CompleteProfileScreen expects ModalRoute args in our implementation.
-            // We'll push replacement with arguments later where used. For simplicity, we'll just show the screen.
-          );
-        }
+        start = doc.exists ? const HomeScreen() : const CompleteProfileScreen();
       } else if (user != null && !saved) {
-        // No pref but Firebase has user (possible after cold restart). Use Firestore check.
         final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-        if (doc.exists) {
-          start = const HomeScreen();
-        } else {
-          start = CompleteProfileScreen();
-        }
+        start = doc.exists ? const HomeScreen() : const CompleteProfileScreen();
       } else {
-        // fallback: show login screen
         start = const LoginScreen();
       }
-    } catch (e) {
-      // ignore and show login
+    } catch (_) {
       start = const LoginScreen();
     }
 
@@ -123,10 +103,11 @@ class _MyAppState extends State<MyApp> {
           labelStyle: const TextStyle(color: Color(0xFFE8E8E8)),
         ),
       ),
-      // If _startScreen is null we are still checking: show a quick splash
+      // Use `home` to show the decided start screen (no '/' routes conflict).
       home: _startScreen ?? const SplashScreen(),
+      // Do NOT include '/' inside routes when using `home:`
       routes: {
-        '/': (_) => const LoginScreen(),
+        // '/' : removed to avoid duplicate with `home`
         HomeScreen.route: (_) => const HomeScreen(),
         CompleteProfileScreen.route: (_) => const CompleteProfileScreen(),
       },
@@ -134,7 +115,6 @@ class _MyAppState extends State<MyApp> {
   }
 }
 
-/// Simple splash while main decides where to go
 class SplashScreen extends StatelessWidget {
   const SplashScreen({super.key});
   @override
