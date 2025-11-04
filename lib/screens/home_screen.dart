@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 class HomeScreen extends StatefulWidget {
-  static const String route = '/home'; // ✅ Added route name
+  static const String route = '/home';
 
   const HomeScreen({Key? key}) : super(key: key);
 
@@ -22,8 +22,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    const lime = Color(0xFFB6FF3B);
+
     return Scaffold(
-      backgroundColor: const Color(0xFF0F0F0F),
+      backgroundColor: Colors.black,
       body: pages[selectedIndex],
       bottomNavigationBar: Container(
         color: const Color(0xFF1A1A1A),
@@ -31,18 +33,18 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            navItem(Icons.home, "Home", 0),
-            navItem(Icons.download, "Downloads", 1),
-            navItem(Icons.search, "Search", 2),
-            navItem(Icons.folder_open, "Library", 3),
-            navItem(Icons.person, "Profile", 4),
+            navItem(Icons.home, "Home", 0, lime),
+            navItem(Icons.download, "Downloads", 1, lime),
+            navItem(Icons.search, "Search", 2, lime),
+            navItem(Icons.folder_open, "Library", 3, lime),
+            navItem(Icons.person, "Profile", 4, lime),
           ],
         ),
       ),
     );
   }
 
-  Widget navItem(IconData icon, String label, int index) {
+  Widget navItem(IconData icon, String label, int index, Color lime) {
     final isSelected = selectedIndex == index;
     return GestureDetector(
       onTap: () => setState(() => selectedIndex = index),
@@ -51,17 +53,23 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           Container(
             decoration: BoxDecoration(
-              color: isSelected ? Colors.red : Colors.transparent,
+              color: isSelected ? lime : Colors.transparent,
               borderRadius: BorderRadius.circular(30),
             ),
             padding: const EdgeInsets.all(10),
-            child: Icon(icon,
-                color: isSelected ? Colors.white : Colors.grey, size: 24),
+            child: Icon(
+              icon,
+              color: isSelected ? Colors.black : Colors.grey,
+              size: 24,
+            ),
           ),
-          Text(label,
-              style: TextStyle(
-                  color: isSelected ? Colors.white : Colors.grey,
-                  fontSize: 12))
+          Text(
+            label,
+            style: TextStyle(
+              color: isSelected ? lime : Colors.grey,
+              fontSize: 12,
+            ),
+          ),
         ],
       ),
     );
@@ -73,6 +81,8 @@ class MovieHomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const lime = Color(0xFFB6FF3B);
+
     return SafeArea(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
@@ -84,30 +94,40 @@ class MovieHomePage extends StatelessWidget {
               borderRadius: BorderRadius.circular(16),
               child: Stack(
                 children: [
-                  Image.asset("assets/topgun.jpg",
-                      width: double.infinity, height: 200, fit: BoxFit.cover),
+                  Image.asset(
+                    "assets/img/topgun.jpg",
+                    width: double.infinity,
+                    height: 200,
+                    fit: BoxFit.cover,
+                  ),
                   Positioned(
                     bottom: 10,
                     left: 10,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: const [
-                        Text("Top Gun",
-                            style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold)),
-                        Text("⭐ 8.4 | Thriller | 2022",
-                            style: TextStyle(color: Colors.white70)),
+                        Text(
+                          "Top Gun",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          "⭐ 8.4 | Thriller | 2022",
+                          style: TextStyle(color: Colors.white70),
+                        ),
                       ],
                     ),
                   ),
+                  // Play Button — changed from red → lime
                   const Positioned(
                     bottom: 10,
                     right: 10,
                     child: CircleAvatar(
-                      backgroundColor: Colors.red,
-                      child: Icon(Icons.play_arrow, color: Colors.white),
+                      backgroundColor: Color(0xFFB6FF3B),
+                      child: Icon(Icons.play_arrow, color: Colors.black),
                     ),
                   ),
                 ],
@@ -116,13 +136,13 @@ class MovieHomePage extends StatelessWidget {
             const SizedBox(height: 20),
 
             // Trending Now
-            sectionHeader("Trending Now"),
+            sectionHeader("Trending Now", lime),
             const SizedBox(height: 10),
             movieRow([
-              "assets/midway.jpg",
-              "assets/action.jpg",
-              "assets/agilan.jpg",
-              "assets/pushpa.jpg",
+              "assets/img/midway.jpg",
+              "assets/img/action.jpg",
+              "assets/img/agilan.jpg",
+              "assets/img/pushpa.jpg",
             ], [
               "Midway",
               "Action",
@@ -132,15 +152,15 @@ class MovieHomePage extends StatelessWidget {
             const SizedBox(height: 20),
 
             // Latest Shows
-            sectionHeader("Latest Shows"),
+            sectionHeader("Latest Shows", lime),
             const SizedBox(height: 10),
-            filterChips(["All", "Movies", "Drama", "Thriller", "Romance"]),
+            filterChips(["All", "Movies", "Drama", "Thriller", "Romance"], lime),
             const SizedBox(height: 10),
             movieRow([
-              "assets/pushpa.jpg",
-              "assets/action.jpg",
-              "assets/agilan.jpg",
-              "assets/midway.jpg",
+              "assets/img/pushpa.jpg",
+              "assets/img/action.jpg",
+              "assets/img/agilan.jpg",
+              "assets/img/midway.jpg",
             ], [
               "Pushpa",
               "Action",
@@ -153,19 +173,21 @@ class MovieHomePage extends StatelessWidget {
     );
   }
 
-  Widget sectionHeader(String title) {
+  Widget sectionHeader(String title, Color lime) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(title,
-            style: const TextStyle(
-                color: Colors.red, fontWeight: FontWeight.bold, fontSize: 16)),
+        Text(
+          title,
+          style:
+          TextStyle(color: lime, fontWeight: FontWeight.bold, fontSize: 16),
+        ),
         const Text("Show all", style: TextStyle(color: Colors.white70)),
       ],
     );
   }
 
-  Widget filterChips(List<String> labels) {
+  Widget filterChips(List<String> labels, Color lime) {
     return SizedBox(
       height: 35,
       child: ListView.separated(
@@ -178,13 +200,16 @@ class MovieHomePage extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: isSelected ? Colors.red : const Color(0xFF1E1E1E),
+              color: isSelected ? lime : const Color(0xFF1E1E1E),
               borderRadius: BorderRadius.circular(30),
             ),
-            child: Text(labels[index],
-                style: TextStyle(
-                    color: isSelected ? Colors.white : Colors.white70,
-                    fontSize: 14)),
+            child: Text(
+              labels[index],
+              style: TextStyle(
+                color: isSelected ? Colors.black : Colors.white70,
+                fontSize: 14,
+              ),
+            ),
           );
         },
       ),
@@ -203,12 +228,18 @@ class MovieHomePage extends StatelessWidget {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(10),
-              child: Image.asset(imagePaths[index],
-                  width: 100, height: 120, fit: BoxFit.cover),
+              child: Image.asset(
+                imagePaths[index],
+                width: 100,
+                height: 120,
+                fit: BoxFit.cover,
+              ),
             ),
             const SizedBox(height: 5),
-            Text(titles[index],
-                style: const TextStyle(color: Colors.white, fontSize: 12)),
+            Text(
+              titles[index],
+              style: const TextStyle(color: Colors.white, fontSize: 12),
+            ),
           ],
         ),
       ),
