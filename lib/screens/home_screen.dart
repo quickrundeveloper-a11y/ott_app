@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 class HomeScreen extends StatefulWidget {
+  static const String route = '/home'; // ✅ Added route name
+
   const HomeScreen({Key? key}) : super(key: key);
 
   @override
@@ -58,7 +60,8 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           Text(label,
               style: TextStyle(
-                  color: isSelected ? Colors.white : Colors.grey, fontSize: 12))
+                  color: isSelected ? Colors.white : Colors.grey,
+                  fontSize: 12))
         ],
       ),
     );
