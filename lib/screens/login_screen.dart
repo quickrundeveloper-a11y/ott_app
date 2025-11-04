@@ -1,3 +1,4 @@
+// lib/login_screen.dart
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -5,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 import 'complete_profile_screen.dart';
 import 'home_screen.dart';
 
@@ -34,42 +36,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    _checkCurrentUser();
-  }
-
-  /// When the screen is created, if a user is already authenticated,
-  /// check if their `users/{uid}` document exists and navigate accordingly.
-  Future<void> _checkCurrentUser() async {
-    final current = FirebaseAuth.instance.currentUser;
-    if (current == null) return; // no signed-in user
-
-    if (mounted) setState(() => _loading = true);
-    try {
-      final doc = await FirebaseFirestore.instance.collection('users').doc(current.uid).get();
-      if (!mounted) return;
-
-      if (doc.exists) {
-        // existing user -> Home
-        Navigator.pushReplacementNamed(context, HomeScreen.route);
-      } else {
-        // new / missing profile -> Complete profile
-        Navigator.pushReplacementNamed(
-          context,
-          CompleteProfileScreen.route,
-          arguments: CompleteProfileArgs(uid: current.uid, email: current.email),
-        );
-      }
-    } catch (e) {
-      // on error, fallback to CompleteProfile so user can finish setup
-      if (!mounted) return;
-      Navigator.pushReplacementNamed(
-        context,
-        CompleteProfileScreen.route,
-        arguments: CompleteProfileArgs(uid: current.uid, email: current.email),
-      );
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
+    // We do NOT read SharedPreferences here — main.dart decides start screen.
   }
 
   @override
@@ -98,7 +65,6 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       }
     } catch (e) {
-      // If Firestore check fails, fallback to CompleteProfile to avoid blocking the user
       _snack('Could not verify profile. Please complete your profile.');
       if (!mounted) return;
       Navigator.pushReplacementNamed(
@@ -124,7 +90,7 @@ class _LoginScreenState extends State<LoginScreen> {
       });
 
       if (!exists) {
-        // 🆕 NEW USER
+        // NEW USER -> require confirm password
         if (_confirm.text.isEmpty) {
           _snack('Confirm your password to create account');
           return;
@@ -136,13 +102,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
         final cred = await _authService.createUserWithEmail(email: email, password: pass);
 
+        // Save a basic user doc (merge) immediately
         await _authService.saveBasicUserDoc(uid: cred.user!.uid, email: email);
 
-        // Go to complete profile first (new user)
         if (!mounted) return;
         await _navigateAfterSignIn(cred.user!);
       } else {
-        // ✅ EXISTING USER → login → home
+        // EXISTING USER -> sign in
         final cred = await _authService.signInWithEmail(email: email, password: pass);
         await _navigateAfterSignIn(cred.user!);
       }
@@ -158,20 +124,14 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _handleGoogleLogin() async {
     setState(() => _loading = true);
     try {
-      // Attempt Google sign-in via your AuthService
       final cred = await _authService.signInWithGoogle();
-
       final user = cred.user!;
-      // Decide where to send the user depending on whether their users/doc exists
       await _navigateAfterSignIn(user);
     } on FirebaseAuthException catch (e) {
-      // Firebase-specific errors
       _snack(e.message ?? e.code);
     } on PlatformException catch (e) {
-      // Handle Google Sign-In / Play Services errors (ApiException: 10 is common for SHA mismatch)
       final code = e.code ?? 'unknown';
-      _snack('Google sign-in failed (code: $code).\nIf you see ApiException: 10, add your Android app SHA-1 to Firebase console and update the OAuth client in Google Cloud.');
-      // optional: print full details to console for debugging
+      _snack('Google sign-in failed (code: $code). If you see ApiException: 10, add SHA-1 to Firebase.');
       // ignore: avoid_print
       print('PlatformException during Google sign-in: ${e.code} | ${e.message} | ${e.details}');
     } catch (e) {
@@ -274,8 +234,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       },
                     ),
 
-                    // Confirm password for new users
-                    if (_isNewUser || (_checkedEmail && _isNewUser))
+                    // Confirm password only for new users
+                    if (_isNewUser)
                       Padding(
                         padding: const EdgeInsets.only(top: 16),
                         child: TextFormField(
@@ -399,11 +359,16 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-
-
+/// ---------------------
+/// AuthService (kept inside this file as requested)
+/// ---------------------
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+
+  /// Web client ID for Google Sign-In (Android uses this when required)
+  static const String googleWebClientId =
+      "578839911643-mdjn5at4h5vrejrc09ig2d8d862lvnh1.apps.googleusercontent.com";
 
   /// Save user login state to SharedPreferences
   Future<void> saveLoginState({
@@ -424,17 +389,13 @@ class AuthService {
     await prefs.remove('email');
   }
 
-  /// Web client ID for Google Sign-In (Android uses this when required)
-  static const String googleWebClientId =
-      "578839911643-mdjn5at4h5vrejrc09ig2d8d862lvnh1.apps.googleusercontent.com";
-
   /// Check if an email already has sign-in methods (i.e., user exists)
   Future<bool> userExistsByEmail(String email) async {
     final methods = await _auth.fetchSignInMethodsForEmail(email);
     return methods.isNotEmpty;
   }
 
-  /// Sign in existing account
+  /// Sign in existing account (also save login state)
   Future<UserCredential> signInWithEmail({
     required String email,
     required String password,
@@ -444,12 +405,14 @@ class AuthService {
     return cred;
   }
 
-  /// Create new account
+  /// Create new account (also save login state)
   Future<UserCredential> createUserWithEmail({
     required String email,
     required String password,
-  }) {
-    return _auth.createUserWithEmailAndPassword(email: email, password: password);
+  }) async {
+    final cred = await _auth.createUserWithEmailAndPassword(email: email, password: password);
+    await saveLoginState(uid: cred.user!.uid, email: email);
+    return cred;
   }
 
   /// Create/merge a minimal user document right after account creation
@@ -464,20 +427,19 @@ class AuthService {
     }, SetOptions(merge: true));
   }
 
-  /// ✅ Save full profile fields (used by CompleteProfileScreen)
+  /// Save full profile fields (used by CompleteProfileScreen)
   Future<void> saveProfile({
     required String uid,
     required String firstName,
     required String lastName,
     required DateTime dob,
-    required String gender, // 'male' | 'female'
+    required String gender,
     String? email,
   }) async {
     await _db.collection('users').doc(uid).set({
       if (email != null) 'email': email,
       'firstName': firstName,
       'lastName': lastName,
-      // Firestore stores DateTime as Timestamp automatically
       'dob': dob,
       'gender': gender,
       'updatedAt': FieldValue.serverTimestamp(),
@@ -512,5 +474,11 @@ class AuthService {
       await saveLoginState(uid: cred.user!.uid, email: cred.user?.email ?? '');
       return cred;
     }
+  }
+
+  /// Optional: helper to read pref locally
+  Future<bool> isLocallyLoggedIn() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool('isLoggedIn') ?? false;
   }
 }
