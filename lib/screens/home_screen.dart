@@ -94,34 +94,24 @@ class MovieHomePage extends StatelessWidget {
               borderRadius: BorderRadius.circular(16),
               child: Stack(
                 children: [
-                  Image.asset(
-                    "assets/img/topgun.jpg",
-                    width: double.infinity,
-                    height: 200,
-                    fit: BoxFit.cover,
-                  ),
+                  Image.asset("assets/img/topgun.jpg",
+                      width: double.infinity, height: 200, fit: BoxFit.cover),
                   Positioned(
                     bottom: 10,
                     left: 10,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: const [
-                        Text(
-                          "Top Gun",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          "⭐ 8.4 | Thriller | 2022",
-                          style: TextStyle(color: Colors.white70),
-                        ),
+                        Text("Top Gun",
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold)),
+                        Text("⭐ 8.4 | Thriller | 2022",
+                            style: TextStyle(color: Colors.white70)),
                       ],
                     ),
                   ),
-                  // Play Button — changed from red → lime
                   const Positioned(
                     bottom: 10,
                     right: 10,
@@ -177,11 +167,9 @@ class MovieHomePage extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          title,
-          style:
-          TextStyle(color: lime, fontWeight: FontWeight.bold, fontSize: 16),
-        ),
+        Text(title,
+            style: TextStyle(
+                color: lime, fontWeight: FontWeight.bold, fontSize: 16)),
         const Text("Show all", style: TextStyle(color: Colors.white70)),
       ],
     );
@@ -203,13 +191,10 @@ class MovieHomePage extends StatelessWidget {
               color: isSelected ? lime : const Color(0xFF1E1E1E),
               borderRadius: BorderRadius.circular(30),
             ),
-            child: Text(
-              labels[index],
-              style: TextStyle(
-                color: isSelected ? Colors.black : Colors.white70,
-                fontSize: 14,
-              ),
-            ),
+            child: Text(labels[index],
+                style: TextStyle(
+                    color: isSelected ? Colors.black : Colors.white70,
+                    fontSize: 14)),
           );
         },
       ),
@@ -228,18 +213,12 @@ class MovieHomePage extends StatelessWidget {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(10),
-              child: Image.asset(
-                imagePaths[index],
-                width: 100,
-                height: 120,
-                fit: BoxFit.cover,
-              ),
+              child: Image.asset(imagePaths[index],
+                  width: 100, height: 120, fit: BoxFit.cover),
             ),
             const SizedBox(height: 5),
-            Text(
-              titles[index],
-              style: const TextStyle(color: Colors.white, fontSize: 12),
-            ),
+            Text(titles[index],
+                style: const TextStyle(color: Colors.white, fontSize: 12)),
           ],
         ),
       ),
