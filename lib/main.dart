@@ -10,16 +10,34 @@ import 'package:ott_app/screens/complete_profile_screen.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Using your inline FirebaseOptions is OK.
-  await Firebase.initializeApp(
-    options: const FirebaseOptions(
-      apiKey: "AIzaSyCm6VK_CNVZnPoJkolF4u8rEBw4l21o4oc",
-      appId: "1:578839911643:android:8c34afb687a643857140fe",
-      messagingSenderId: "578839911643",
-      projectId: "ott-app-a3eaf",
-      storageBucket: "ott-app-a3eaf.firebasestorage.app",
-    ),
-  );
+  // Initialize Firebase in a way that's resilient to duplicate-app errors.
+  try {
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp(
+        options: const FirebaseOptions(
+          apiKey: "AIzaSyCm6VK_CNVZnPoJkolF4u8rEBw4l21o4oc",
+          appId: "1:578839911643:android:8c34afb687a643857140fe",
+          messagingSenderId: "578839911643",
+          projectId: "ott-app-a3eaf",
+          storageBucket: "ott-app-a3eaf.firebasestorage.app",
+        ),
+      );
+    } else {
+      // Firebase already initialized — safe to continue.
+      // Useful during hot restart/hot reload in development.
+      // You can optionally log this if needed.
+      // print('Firebase already initialized');
+    }
+  } on FirebaseException catch (e) {
+    // If another init happened concurrently and caused a duplicate-app error,
+    // ignore it; otherwise rethrow so real errors surface.
+    if (e.code != 'duplicate-app') {
+      rethrow;
+    }
+  } catch (e) {
+    // Non-Firebase exceptions should still surface.
+    rethrow;
+  }
 
   runApp(const MyApp());
 }
