@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:ott_app/screens/profile_screen.dart';
 
+import '../movie_details.dart';
 import '../series_details.dart';
  // <-- seriesdetails class
 
@@ -23,7 +24,7 @@ class _HomeScreenState extends State<HomeScreen> {
     const MovieHomePage(),
     const seriesdetails(), // <-- Downloads tab uses your seriesdetails screen
     const Center(child: Icon(Icons.search, color: Colors.white)),
-    const Center(child: Icon(Icons.folder_open, color: Colors.white)),
+    const MovieDetailPage(),
     const ProfilePage(),
   ];
 
