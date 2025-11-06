@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:ott_app/screens/profile_screen.dart';
 
 import '../series_details.dart';
-// <-- import your seriesdetails file
+ // <-- seriesdetails class
+
+// NOTE: This file intentionally does NOT include void main().
 
 class HomeScreen extends StatefulWidget {
   static const String route = '/home';
@@ -16,9 +18,10 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int selectedIndex = 0;
 
+  // Keep the bottom navigation persistent. Downloads tab shows the seriesdetails page.
   final List<Widget> pages = [
     const MovieHomePage(),
-    const Center(child: Icon(Icons.download, color: Colors.white)),
+    const seriesdetails(), // <-- Downloads tab uses your seriesdetails screen
     const Center(child: Icon(Icons.search, color: Colors.white)),
     const Center(child: Icon(Icons.folder_open, color: Colors.white)),
     const ProfilePage(),
@@ -51,18 +54,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget navItem(IconData icon, String label, int index, Color lime) {
     final isSelected = selectedIndex == index;
     return GestureDetector(
-      onTap: () {
-        // If Downloads icon tapped, open seriesdetails screen (push)
-        if (index == 1) {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const seriesdetails()),
-          );
-          return;
-        }
-
-        // Otherwise behave like before and change bottom nav selection
-        setState(() => selectedIndex = index);
-      },
+      onTap: () => setState(() => selectedIndex = index),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
