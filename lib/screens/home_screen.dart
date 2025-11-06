@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:ott_app/screens/profile_screen.dart';
-
-import '../movie_details.dart';
-
-// ✅ Import MovieDetailPage
+ // ✅ Import your ProfilePage here
 
 class HomeScreen extends StatefulWidget {
   static const String route = '/home';
@@ -21,8 +18,8 @@ class _HomeScreenState extends State<HomeScreen> {
     const MovieHomePage(),
     const Center(child: Icon(Icons.download, color: Colors.white)),
     const Center(child: Icon(Icons.search, color: Colors.white)),
-    const MovieDetailPage(), // ✅ Show MovieDetailPage when "Library" icon is tapped
-    const ProfilePage(),
+    const Center(child: Icon(Icons.folder_open, color: Colors.white)),
+    const ProfilePage(), // ✅ Show your ProfilePage here
   ];
 
   @override
@@ -41,7 +38,7 @@ class _HomeScreenState extends State<HomeScreen> {
             navItem(Icons.home, "Home", 0, lime),
             navItem(Icons.download, "Downloads", 1, lime),
             navItem(Icons.search, "Search", 2, lime),
-            navItem(Icons.folder_open, "Library", 3, lime), // ✅ opens MovieDetailPage
+            navItem(Icons.folder_open, "Library", 3, lime),
             navItem(Icons.person, "Profile", 4, lime),
           ],
         ),
