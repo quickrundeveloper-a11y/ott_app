@@ -5,7 +5,8 @@ import 'package:flutter/material.dart';
 // Add the images used here to your pubspec.yaml under assets and provide the correct paths.
 
 class seriesdetails extends StatefulWidget {
-  const seriesdetails({Key? key}) : super(key: key);
+  final String? videoId;
+  const seriesdetails({Key? key,this.videoId}) : super(key: key);
 
   @override
   _seriesdetailsState createState() => _seriesdetailsState();
@@ -180,7 +181,7 @@ class _seriesdetailsState extends State<seriesdetails>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Stranger Things',
+            "Stranger Things",
             style: TextStyle(
                 color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold),
           ),

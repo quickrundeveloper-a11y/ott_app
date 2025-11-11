@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:ott_app/screens/profile_screen.dart';
 import '../movie_details.dart';
 import '../series_details.dart';
 import '../search_page.dart';
+import '../screens/profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   static const String route = '/home';
@@ -135,7 +135,7 @@ class HomeScreenBody extends StatelessWidget {
             // 🔥 Trending Now (Dynamic from Firebase)
             sectionHeader("Trending Now", lime),
             const SizedBox(height: 10),
-            buildMovieList(),
+            buildMovieList(context),
 
             const SizedBox(height: 20),
 
@@ -144,14 +144,14 @@ class HomeScreenBody extends StatelessWidget {
             const SizedBox(height: 10),
             filterChips(["All", "Movies", "Drama", "Thriller", "Romance"], lime),
             const SizedBox(height: 10),
-            buildMovieList(),
+            buildMovieList(context),
           ],
         ),
       ),
     );
   }
 
-  Widget buildMovieList() {
+  Widget buildMovieList(BuildContext context) {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance.collection('videos').snapshots(),
       builder: (context, snapshot) {
@@ -172,34 +172,56 @@ class HomeScreenBody extends StatelessWidget {
             itemCount: videos.length,
             separatorBuilder: (_, __) => const SizedBox(width: 10),
             itemBuilder: (context, index) {
-              final video = videos[index].data() as Map<String, dynamic>;
-              final coverURL = video['coverURL'] ?? '';
+              final doc = videos[index];
+              final video = doc.data() as Map<String, dynamic>;
+              final coverURL = video['coverURL'] ?? video['videoURL'] ?? '';
               final title = video['title'] ?? 'Untitled';
+              final type = (video['type'] ?? '').toString().toLowerCase();
 
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: Image.network(
-                      coverURL,
-                      width: 100,
-                      height: 120,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
+              return GestureDetector(
+                onTap: () {
+                  final id = doc.id;
+                  if (type == 'web series' || type == 'series') {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => seriesdetails(videoId: id),
+                      ),
+                    );
+                  } else {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => MovieDetailPage(videoId: id),
+                      ),
+                    );
+                  }
+                },
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Image.network(
+                        coverURL,
                         width: 100,
                         height: 120,
-                        color: Colors.grey.shade800,
-                        child: const Icon(Icons.broken_image,
-                            color: Colors.white),
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          width: 100,
+                          height: 120,
+                          color: Colors.grey.shade800,
+                          child: const Icon(Icons.broken_image,
+                              color: Colors.white),
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 5),
-                  Text(title,
-                      style:
-                      const TextStyle(color: Colors.white, fontSize: 12)),
-                ],
+                    const SizedBox(height: 5),
+                    Text(title,
+                        style:
+                        const TextStyle(color: Colors.white, fontSize: 12)),
+                  ],
+                ),
               );
             },
           ),
