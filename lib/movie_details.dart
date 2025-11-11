@@ -80,7 +80,7 @@ class MovieDetailPage extends StatelessWidget {
 
             const SizedBox(height: 10),
 
-            Container(
+            Center(
               child: OutlinedButton.icon(
                 onPressed: () {},
                 icon: const Icon(Icons.download, color: Colors.green),
@@ -91,7 +91,7 @@ class MovieDetailPage extends StatelessWidget {
                 style: OutlinedButton.styleFrom(
                   side: const BorderSide(color: Colors.green),
                   padding:
-                  const EdgeInsets.symmetric(horizontal: 106, vertical: 10),
+                  const EdgeInsets.symmetric(horizontal: 110, vertical: 10),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8)),
                 ),

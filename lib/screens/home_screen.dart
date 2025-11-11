@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:ott_app/screens/profile_screen.dart';
-
 import '../movie_details.dart';
 import '../series_details.dart';
- // <-- seriesdetails class
-
-// NOTE: This file intentionally does NOT include void main().
+import '../search_page.dart';
 
 class HomeScreen extends StatefulWidget {
   static const String route = '/home';
@@ -19,11 +17,10 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int selectedIndex = 0;
 
-  // Keep the bottom navigation persistent. Downloads tab shows the seriesdetails page.
   final List<Widget> pages = [
-    const MovieHomePage(),
-    const seriesdetails(), // <-- Downloads tab uses your seriesdetails screen
-    const Center(child: Icon(Icons.search, color: Colors.white)),
+    const HomeScreenBody(),
+    const seriesdetails(),
+    const MovieSearchScreen(),
     const MovieDetailPage(),
     const ProfilePage(),
   ];
@@ -84,8 +81,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-class MovieHomePage extends StatelessWidget {
-  const MovieHomePage({Key? key}) : super(key: key);
+// ------------------- Home Screen Body -------------------
+
+class HomeScreenBody extends StatelessWidget {
+  const HomeScreenBody({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -133,41 +132,79 @@ class MovieHomePage extends StatelessWidget {
             ),
             const SizedBox(height: 20),
 
-            // Trending Now
+            // 🔥 Trending Now (Dynamic from Firebase)
             sectionHeader("Trending Now", lime),
             const SizedBox(height: 10),
-            movieRow([
-              "assets/img/midway.jpg",
-              "assets/img/action.jpg",
-              "assets/img/agilan.jpg",
-              "assets/img/pushpa.jpg",
-            ], [
-              "Midway",
-              "Action",
-              "Agilan",
-              "Pushpa",
-            ]),
+            buildMovieList(),
+
             const SizedBox(height: 20),
 
-            // Latest Shows
+            // 🔥 Latest Shows (Dynamic from Firebase)
             sectionHeader("Latest Shows", lime),
             const SizedBox(height: 10),
             filterChips(["All", "Movies", "Drama", "Thriller", "Romance"], lime),
             const SizedBox(height: 10),
-            movieRow([
-              "assets/img/pushpa.jpg",
-              "assets/img/action.jpg",
-              "assets/img/agilan.jpg",
-              "assets/img/midway.jpg",
-            ], [
-              "Pushpa",
-              "Action",
-              "Agilan",
-              "Midway",
-            ]),
+            buildMovieList(),
           ],
         ),
       ),
+    );
+  }
+
+  Widget buildMovieList() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance.collection('videos').snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return const Text("No videos found",
+              style: TextStyle(color: Colors.white70));
+        }
+
+        final videos = snapshot.data!.docs;
+
+        return SizedBox(
+          height: 160,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: videos.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 10),
+            itemBuilder: (context, index) {
+              final video = videos[index].data() as Map<String, dynamic>;
+              final coverURL = video['coverURL'] ?? '';
+              final title = video['title'] ?? 'Untitled';
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Image.network(
+                      coverURL,
+                      width: 100,
+                      height: 120,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        width: 100,
+                        height: 120,
+                        color: Colors.grey.shade800,
+                        child: const Icon(Icons.broken_image,
+                            color: Colors.white),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(title,
+                      style:
+                      const TextStyle(color: Colors.white, fontSize: 12)),
+                ],
+              );
+            },
+          ),
+        );
+      },
     );
   }
 
@@ -205,30 +242,6 @@ class MovieHomePage extends StatelessWidget {
                     fontSize: 14)),
           );
         },
-      ),
-    );
-  }
-
-  Widget movieRow(List<String> imagePaths, List<String> titles) {
-    return SizedBox(
-      height: 160,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: imagePaths.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 10),
-        itemBuilder: (context, index) => Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: Image.asset(imagePaths[index],
-                  width: 100, height: 120, fit: BoxFit.cover),
-            ),
-            const SizedBox(height: 5),
-            Text(titles[index],
-                style: const TextStyle(color: Colors.white, fontSize: 12)),
-          ],
-        ),
       ),
     );
   }
