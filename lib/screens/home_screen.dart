@@ -19,9 +19,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
   final List<Widget> pages = [
     const HomeScreenBody(),
-    const seriesdetails(),
+    // Placeholder for Downloads page
+    const Center(
+        child: Text("Downloads Page", style: TextStyle(color: Colors.white))),
     const MovieSearchScreen(),
-    const MovieDetailPage(),
+    // Placeholder for Library page. MovieDetailPage requires a videoId,
+    // so it cannot be instantiated here directly. You would navigate to it
+    // from a list on a dedicated Library screen.
+    const Center(
+        child: Text("Library Page", style: TextStyle(color: Colors.white))),
     const ProfilePage(),
   ];
 

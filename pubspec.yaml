@@ -39,6 +39,8 @@ dependencies:
   cloud_firestore: ^5.4.4
   google_sign_in: ^6.2.1
   firebase_auth: ^5.3.1
+  chewie:
+  video_player:
 
 dev_dependencies:
   flutter_test:

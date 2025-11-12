@@ -1,13 +1,111 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:video_player/video_player.dart';
+import 'package:chewie/chewie.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+class MovieDetailPage extends StatefulWidget {
+  final String videoId;
+  const MovieDetailPage({super.key, required this.videoId});
 
-class MovieDetailPage extends StatelessWidget {
-  final String? videoId;
-  const MovieDetailPage({super.key, this.videoId});
+  @override
+  State<MovieDetailPage> createState() => _MovieDetailPageState();
+}
 
-
+class _MovieDetailPageState extends State<MovieDetailPage> {
   static const Color limeColor = Color(0xFFB6FF3B);
   static const double horizontalPadding = 18.0;
+
+  VideoPlayerController? _videoController;
+  ChewieController? _chewieController;
+  bool _isPlaying = false;
+  bool _isBuffering = false;
+  Duration? _resumePosition;
+
+  Future<DocumentSnapshot<Map<String, dynamic>>> getMovieDetails() async {
+    return FirebaseFirestore.instance.collection('videos').doc(widget.videoId).get();
+  }
+
+  // ✅ Load last saved playback time from SharedPreferences
+  Future<void> _loadResumePosition() async {
+    final prefs = await SharedPreferences.getInstance();
+    final millis = prefs.getInt('resume_${widget.videoId}');
+    if (millis != null && millis > 0) {
+      _resumePosition = Duration(milliseconds: millis);
+    }
+  }
+
+  // ✅ Save playback position periodically
+  Future<void> _savePlaybackPosition(Duration position) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('resume_${widget.videoId}', position.inMilliseconds);
+  }
+
+  Future<void> _playFirebaseVideo(String url) async {
+    try {
+      await _loadResumePosition();
+
+      final controller = VideoPlayerController.networkUrl(Uri.parse(url));
+
+      controller.addListener(() {
+        final val = controller.value;
+        if (val.isBuffering != _isBuffering) {
+          setState(() => _isBuffering = val.isBuffering);
+        }
+
+        // Save position every 5 seconds
+        if (val.isInitialized && val.position.inSeconds % 5 == 0) {
+          _savePlaybackPosition(val.position);
+        }
+      });
+
+      await controller.initialize();
+
+      // ✅ Seek to last saved position if available
+      if (_resumePosition != null && _resumePosition!.inSeconds > 5) {
+        await controller.seekTo(_resumePosition!);
+      }
+
+      controller.play();
+
+      final chewie = ChewieController(
+        videoPlayerController: controller,
+        autoPlay: true,
+        looping: false,
+        allowFullScreen: true,
+        allowPlaybackSpeedChanging: true,
+        allowMuting: true,
+        materialProgressColors: ChewieProgressColors(
+          playedColor: limeColor,
+          handleColor: limeColor,
+          backgroundColor: Colors.white24,
+          bufferedColor: Colors.white38,
+        ),
+      );
+
+      setState(() {
+        _videoController = controller;
+        _chewieController = chewie;
+        _isPlaying = true;
+      });
+    } catch (e) {
+      debugPrint("Video playback error: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error playing video: $e")),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    // ✅ Save final position on exit
+    if (_videoController != null && _videoController!.value.isInitialized) {
+      _savePlaybackPosition(_videoController!.value.position);
+    }
+    _videoController?.dispose();
+    _chewieController?.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -20,9 +118,9 @@ class MovieDetailPage extends StatelessWidget {
           icon: const Icon(Icons.arrow_back_ios, color: limeColor),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text(
-          "Movie Details ${videoId}",
-          style: const TextStyle(
+        title: const Text(
+          "Movie Details",
+          style: TextStyle(
             color: limeColor,
             fontWeight: FontWeight.bold,
             fontSize: 20,
@@ -30,149 +128,232 @@ class MovieDetailPage extends StatelessWidget {
         ),
         centerTitle: true,
       ),
-
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Movie Poster
-            ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: Image.asset(
-                'assets/img/croods.jpg',
-                width: double.infinity,
-                height: 250,
-                fit: BoxFit.cover,
+      body: FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+        future: getMovieDetails(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator(color: limeColor));
+          }
+          if (!snapshot.hasData || !snapshot.data!.exists) {
+            return const Center(
+              child: Text(
+                "No movie found.",
+                style: TextStyle(color: Colors.white70),
               ),
-            ),
+            );
+          }
 
-            const SizedBox(height: 20),
+          final data = snapshot.data!.data()!;
+          final String videoURL = data['videoURL'] ?? '';
+          final String coverURL = data['coverURL'] ?? '';
+          final String title = data['title'] ?? 'Untitled';
+          final String genre = data['genre'] ?? 'Unknown';
+          final String description = data['description'] ?? 'No description available.';
+          final String language = data['language'] ?? '';
+          final String cast = data['cast'] ?? '';
+          final String director = data['director'] ?? '';
+          final String releaseYear = data['releaseYear'] ?? '';
 
-            // Movie Title
-            const Text(
-              "The Croods",
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+          return SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Movie Poster or Video Player
+                AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        if (_isPlaying && _chewieController != null)
+                          Chewie(controller: _chewieController!)
+                        else if (coverURL.isNotEmpty)
+                          Image.network(
+                            coverURL,
+                            width: double.infinity,
+                            height: 250,
+                            fit: BoxFit.cover,
+                          )
+                        else
+                          Container(
+                            color: Colors.grey[900],
+                            alignment: Alignment.center,
+                            child: const Text(
+                              "No Image",
+                              style: TextStyle(color: Colors.white54),
+                            ),
+                          ),
 
-            const SizedBox(height: 8),
+                        // 🔄 Buffering Indicator
+                        if (_isBuffering)
+                          Container(
+                            color: Colors.black26,
+                            child: const Center(
+                              child: CircularProgressIndicator(
+                                color: limeColor,
+                                strokeWidth: 3,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
 
-            // Rating and Year Row
-            Row(
-              children: const [
-                Icon(Icons.star, color: limeColor, size: 20),
-                SizedBox(width: 4),
-                Text("8.8", style: TextStyle(color: limeColor, fontSize: 16)),
-                SizedBox(width: 10),
-                Icon(Icons.calendar_month, color: limeColor, size: 18),
-                SizedBox(width: 4),
-                Text("2023", style: TextStyle(color: Colors.white70, fontSize: 16)),
-              ],
-            ),
+                const SizedBox(height: 20),
 
-            const SizedBox(height: 24),
-
-            // Play Button
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.play_arrow, color: Colors.black),
-                label: const Text(
-                  "Play",
-                  style: TextStyle(
-                    color: Colors.black,
+                // Movie Title
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 28,
                     fontWeight: FontWeight.bold,
-                    fontSize: 16,
                   ),
                 ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: limeColor,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+
+                const SizedBox(height: 8),
+
+                // Director and Year Row
+                Row(
+                  children: [
+                    const Icon(Icons.movie, color: limeColor, size: 20),
+                    const SizedBox(width: 4),
+                    Text(
+                      director.isNotEmpty ? director : "Unknown Director",
+                      style: const TextStyle(color: Colors.white70, fontSize: 16),
+                    ),
+                    const SizedBox(width: 10),
+                    const Icon(Icons.calendar_month, color: limeColor, size: 18),
+                    const SizedBox(width: 4),
+                    Text(
+                      releaseYear.isNotEmpty ? releaseYear : "N/A",
+                      style: const TextStyle(color: Colors.white70, fontSize: 16),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 24),
+
+                // Play Button
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      if (videoURL.isNotEmpty) {
+                        _playFirebaseVideo(videoURL);
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text("No video URL found!")),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.play_arrow, color: Colors.black),
+                    label: const Text(
+                      "Play / Resume",
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: limeColor,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
 
-            const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
-            // Download Button
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: OutlinedButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.download, color: limeColor),
-                label: const Text(
-                  "Download",
+                // Download Button
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: OutlinedButton.icon(
+                    onPressed: () {},
+                    icon: const Icon(Icons.download, color: limeColor),
+                    label: const Text(
+                      "Download",
+                      style: TextStyle(
+                        color: limeColor,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: limeColor, width: 2),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 30),
+
+                // Genre
+                const Text(
+                  "Genre",
                   style: TextStyle(
                     color: limeColor,
+                    fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    fontSize: 16,
                   ),
                 ),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: limeColor, width: 2),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 30),
-
-            // Genre Section
-            const Text(
-              "Genre",
-              style: TextStyle(
-                color: limeColor,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 6),
-            const Text(
-              "Animation, Cartoon",
-              style: TextStyle(color: Colors.white, fontSize: 16),
-            ),
-
-            const SizedBox(height: 20),
-
-            // Description Section
-            const Text(
-              "Description",
-              style: TextStyle(
-                color: limeColor,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 6),
-            const Text(
-              "A fun animated adventure following the prehistoric Crood family as they explore "
-                  "a dangerous new world filled with strange creatures and new discoveries. "
-                  "Full of humor, heart, and beautiful animation, it's a must-watch for families.",
-              style: TextStyle(
-                color: Colors.white70,
-                fontSize: 15,
-                height: 1.6,
-              ),
-            ),
-
-            const SizedBox(height: 30),
-
-            // Cast Section Header
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: const [
+                const SizedBox(height: 6),
                 Text(
+                  genre,
+                  style: const TextStyle(color: Colors.white, fontSize: 16),
+                ),
+
+                const SizedBox(height: 20),
+
+                // Language
+                const Text(
+                  "Language",
+                  style: TextStyle(
+                    color: limeColor,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  language.isNotEmpty ? language : "N/A",
+                  style: const TextStyle(color: Colors.white, fontSize: 16),
+                ),
+
+                const SizedBox(height: 20),
+
+                // Description
+                const Text(
+                  "Description",
+                  style: TextStyle(
+                    color: limeColor,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  description,
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 15,
+                    height: 1.6,
+                  ),
+                ),
+
+                const SizedBox(height: 30),
+
+                // Cast
+                const Text(
                   "Cast",
                   style: TextStyle(
                     color: limeColor,
@@ -180,58 +361,17 @@ class MovieDetailPage extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
+                const SizedBox(height: 12),
                 Text(
-                  "See more",
-                  style: TextStyle(
-                    color: limeColor,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  cast.isNotEmpty ? cast : "No cast information available.",
+                  style: const TextStyle(color: Colors.white70, fontSize: 15, height: 1.6),
                 ),
+
+                const SizedBox(height: 30),
               ],
             ),
-
-            const SizedBox(height: 16),
-
-            // Cast List
-            SizedBox(
-              height: 120,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: 4,
-                separatorBuilder: (_, __) => const SizedBox(width: 14),
-                itemBuilder: (context, index) {
-                  return Column(
-                    children: [
-                      CircleAvatar(
-                        radius: 38,
-                        backgroundImage: AssetImage('assets/person${index + 1}.jpg'),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        "XYZ",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const Text(
-                        "Role",
-                        style: TextStyle(
-                          color: Colors.white54,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              ),
-            ),
-
-            const SizedBox(height: 30),
-          ],
-        ),
+          );
+        },
       ),
     );
   }

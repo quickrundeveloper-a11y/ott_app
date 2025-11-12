@@ -16,7 +16,14 @@ class _seriesdetailsState extends State<seriesdetails>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
-  final List<Map<String, String>> episodes = List.generate(8, (index) {
+  late final List<Map<String, String>> episodes;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 4, vsync: this);
+
+    episodes = List.generate(8, (index) {
     final titles = [
       'Chapter One: The Vanishing of Will Byers',
       'Chapter Two: The Weirdo on Maple Street',
@@ -40,16 +47,11 @@ class _seriesdetailsState extends State<seriesdetails>
 
     return {
       'title': titles[index],
-      'duration': '49 mins',
+      'duration': '49 mins'.trim(),
       'description': descriptions[index],
       'thumb': 'assets/thumb_${(index % 4) + 1}.jpg', // placeholder
     };
   });
-
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -180,9 +182,9 @@ class _seriesdetailsState extends State<seriesdetails>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            "Stranger Things",
-            style: TextStyle(
+          Text(
+            "Stranger Things ${widget.videoId ?? ''}",
+            style: const TextStyle(
                 color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
