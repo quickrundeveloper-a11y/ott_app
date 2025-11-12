@@ -41,6 +41,9 @@ dependencies:
   firebase_auth: ^5.3.1
   chewie:
   video_player:
+  dio:
+  path_provider:
+  permission_handler:
 
 dev_dependencies:
   flutter_test:
