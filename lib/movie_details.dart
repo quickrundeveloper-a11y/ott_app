@@ -5,10 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:dio/dio.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-
+import 'package:path_provider/path_provider.dart';
 import 'full_screen_player.dart';
-
 
 class MovieDetailPage extends StatefulWidget {
   final String videoId;
@@ -29,57 +27,42 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
     return FirebaseFirestore.instance.collection('videos').doc(widget.videoId).get();
   }
 
-  // Download to public Movies folder: /storage/emulated/0/Movies
-  Future<void> _requestStorageAndDownload(String url, String title) async {
-    // Android 13+ needs different permissions; we request generic storage permissions first.
+  Future<void> _downloadVideo(String url, String title) async {
     try {
-      // request storage permissions
-      final status = await Permission.storage.request();
-      if (status.isDenied || status.isPermanentlyDenied) {
-        // Try manage external storage (Android 11+)
+      // Request storage permissions
+      if (Platform.isAndroid) {
         if (await Permission.manageExternalStorage.isDenied) {
-          final m = await Permission.manageExternalStorage.request();
-          if (!m.isGranted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Storage permission is required to download.')),
-            );
-            return;
-          }
+          await Permission.manageExternalStorage.request();
+        }
+        if (await Permission.storage.isDenied) {
+          await Permission.storage.request();
         }
       }
-      // Now proceed
-      await _downloadToMovies(url, title);
-    } catch (e) {
-      debugPrint('Permission / download error: $e');
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Download failed: $e')));
-    }
-  }
 
-  Future<void> _downloadToMovies(String url, String title) async {
-    setState(() {
-      _isDownloading = true;
-      _downloadProgress = 0.0;
-    });
+      setState(() {
+        _isDownloading = true;
+        _downloadProgress = 0.0;
+      });
 
-    final dio = Dio();
+      final dio = Dio();
 
-    try {
-      // target path: /storage/emulated/0/Movies
-      Directory moviesDir;
+      // Choose best directory
+      Directory? targetDir;
       if (Platform.isAndroid) {
-        final externalRoot = Directory('/storage/emulated/0');
-        moviesDir = Directory('${externalRoot.path}/Movies');
+        targetDir = Directory('/storage/emulated/0/Movies');
+        if (!await targetDir.exists()) {
+          try {
+            await targetDir.create(recursive: true);
+          } catch (_) {
+            targetDir = await getExternalStorageDirectory();
+          }
+        }
       } else {
-        final temp = Directory.systemTemp;
-        moviesDir = Directory('${temp.path}/Movies');
+        targetDir = await getApplicationDocumentsDirectory();
       }
 
-      if (!await moviesDir.exists()) {
-        await moviesDir.create(recursive: true);
-      }
-
-      final safeName = title.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_');
-      final savePath = '${moviesDir.path}/$safeName.mp4';
+      final safeTitle = title.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_');
+      final savePath = '${targetDir!.path}/$safeTitle.mp4';
 
       await dio.download(
         url,
@@ -95,25 +78,23 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
 
       setState(() {
         _isDownloading = false;
-        _downloadProgress = 0;
+        _downloadProgress = 0.0;
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Downloaded to: $savePath')),
+        SnackBar(content: Text('✅ Downloaded successfully to: $savePath')),
       );
     } catch (e) {
       setState(() {
         _isDownloading = false;
-        _downloadProgress = 0;
+        _downloadProgress = 0.0;
       });
-      debugPrint('Download error: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Download failed: $e')),
+        SnackBar(content: Text('❌ Download failed: $e')),
       );
     }
   }
 
-  // Open full-screen player page (it will start playing immediately)
   void _openFullScreenPlayer(String videoUrl, String title, String videoId) {
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -154,23 +135,46 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
     );
   }
 
-  Widget _downloadButton(String videoUrl, String title) {
-    return SizedBox(
-      width: double.infinity,
-      height: 48,
-      child: OutlinedButton.icon(
-        onPressed: _isDownloading ? null : () => _requestStorageAndDownload(videoUrl, title),
-        icon: _isDownloading
-            ? SizedBox(height: 18, width: 18, child: CircularProgressIndicator(color: limeColor, strokeWidth: 2))
-            : const Icon(Icons.download, color: limeColor),
-        label: _isDownloading
-            ? Text('${(_downloadProgress * 100).toStringAsFixed(0)}%')
-            : const Text('Download', style: TextStyle(color: limeColor, fontWeight: FontWeight.bold, fontSize: 16)),
-        style: OutlinedButton.styleFrom(
-          side: const BorderSide(color: limeColor, width: 2),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+  // ✅ Download button with progress bar BELOW it
+  Widget _downloadSection(String videoUrl, String title) {
+    return Column(
+      children: [
+        SizedBox(
+          width: double.infinity,
+          height: 48,
+          child: OutlinedButton.icon(
+            onPressed: _isDownloading ? null : () => _downloadVideo(videoUrl, title),
+            icon: const Icon(Icons.download, color: limeColor),
+            label: const Text(
+              'Download',
+              style: TextStyle(color: limeColor, fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: limeColor, width: 2),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
         ),
-      ),
+
+        // ✅ Progress bar displayed below button
+        if (_isDownloading) ...[
+          const SizedBox(height: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: LinearProgressIndicator(
+              value: _downloadProgress,
+              backgroundColor: Colors.white10,
+              valueColor: const AlwaysStoppedAnimation<Color>(limeColor),
+              minHeight: 8,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Downloading: ${(_downloadProgress * 100).toStringAsFixed(0)}%',
+            style: const TextStyle(color: Colors.white70, fontSize: 14),
+          ),
+        ],
+      ],
     );
   }
 
@@ -271,18 +275,26 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                       Text(title,
                           style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 8),
-                      Row(children: [Text(releaseYear, style: const TextStyle(color: Colors.white70)), const SizedBox(width: 8), _tag("U/A"), const SizedBox(width: 8), _tag("HD")]),
+                      Row(children: [
+                        Text(releaseYear, style: const TextStyle(color: Colors.white70)),
+                        const SizedBox(width: 8),
+                        _tag("U/A"),
+                        const SizedBox(width: 8),
+                        _tag("HD")
+                      ]),
                       const SizedBox(height: 20),
 
-                      // gradient play (both play button and poster icon do the same)
                       _gradientPlayButton(() {
-                        if (videoURL.isNotEmpty) _openFullScreenPlayer(videoURL, title, widget.videoId);
-                        else ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("No video URL found")));
+                        if (videoURL.isNotEmpty) {
+                          _openFullScreenPlayer(videoURL, title, widget.videoId);
+                        } else {
+                          ScaffoldMessenger.of(context)
+                              .showSnackBar(const SnackBar(content: Text("No video URL found")));
+                        }
                       }),
                       const SizedBox(height: 12),
 
-                      // download
-                      _downloadButton(videoURL, title),
+                      _downloadSection(videoURL, title),
                       const SizedBox(height: 20),
 
                       _section("Description", description),
