@@ -191,7 +191,7 @@ class HomeScreenBody extends StatelessWidget {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => seriesdetails(videoId: id),
+                        builder: (context) => SeriesDetails(videoId: id),
                       ),
                     );
                   } else {

@@ -1,340 +1,430 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
-// NOTE: This file intentionally does NOT include void main().
-// Class requested by user: seriesdetails
-// Add the images used here to your pubspec.yaml under assets and provide the correct paths.
-
-class seriesdetails extends StatefulWidget {
+class SeriesDetails extends StatefulWidget {
   final String? videoId;
-  const seriesdetails({Key? key,this.videoId}) : super(key: key);
+  const SeriesDetails({Key? key, this.videoId}) : super(key: key);
 
   @override
-  _seriesdetailsState createState() => _seriesdetailsState();
+  _SeriesDetailsState createState() => _SeriesDetailsState();
 }
 
-class _seriesdetailsState extends State<seriesdetails>
+class _SeriesDetailsState extends State<SeriesDetails>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  bool showFullDescription = false;
 
-  late final List<Map<String, String>> episodes;
+  late Future<Map<String, dynamic>> _dataFuture;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
-
-    episodes = List.generate(8, (index) {
-    final titles = [
-      'Chapter One: The Vanishing of Will Byers',
-      'Chapter Two: The Weirdo on Maple Street',
-      'Chapter Three: Holly, Jolly',
-      'Chapter Four: The Body',
-      'Chapter Five: The Flea and the Acrobat',
-      'Chapter Six: The Monster',
-      'Chapter Seven: The Bathtub',
-      'Chapter Eight: The Upside Down',
-    ];
-    final descriptions = [
-      'On his way home from a friend\'s house, young Will sees something terrifying. Nearby, a sinister secret lurks in the depths of a government lab.',
-      'Mike hides the mysterious girl in his house. Joyce gets a strange phone call.',
-      'An increasingly concerned Nancy looks for Barb and finds out what Jonathan\'s been up to. Joyce is convinced Will is trying to talk to her.',
-      'Refusing to believe Will is dead, Joyce tries to connect with her son. The boys give Eleven a makeover. Jonathan and Nancy form an unlikely alliance.',
-      'Hopper breaks into the lab to find the truth about Will\'s death. The boys try to locate the \"gate\" that will take them to Will.',
-      'Hopper and Joyce find the truth about the lab\'s experiments. After their fight, the boys look for the missing Eleven.',
-      'The government comes searching for Eleven. Eleven looks for Will and Barb in the Upside Down.',
-      'Joyce and Hopper are taken in for questioning. Nancy and Jonathan prepare to fight the monster and save Will.'
-    ];
-
-    return {
-      'title': titles[index],
-      'duration': '49 mins'.trim(),
-      'description': descriptions[index],
-      'thumb': 'assets/thumb_${(index % 4) + 1}.jpg', // placeholder
-    };
-  });
+    _dataFuture = _fetchVideoAndEpisodes();
   }
 
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
+  Future<Map<String, dynamic>> _fetchVideoAndEpisodes() async {
+    final videoDocRef =
+    FirebaseFirestore.instance.collection('videos').doc(widget.videoId);
+
+    final docSnap = await videoDocRef.get();
+    if (!docSnap.exists) throw Exception("Video not found");
+
+    final videoData = docSnap.data() ?? {};
+
+    // Fetch episodes
+    final epSnap = await videoDocRef
+        .collection('episodes')
+        .orderBy('episodeNumber')
+        .get();
+
+    final episodes = epSnap.docs.map((e) {
+      final d = e.data();
+      return {
+        'title': d['title'] ?? '',
+        'description': d['description'] ?? '',
+        'episodeNumber': d['episodeNumber']?.toString() ?? '',
+        'runtimeSeconds': d['runtimeSeconds']?.toString() ?? '',
+        'coverURL': d['coverURL'] ?? '',
+      };
+    }).toList();
+
+    // Release Year
+    String releaseYear = '';
+    if (videoData['releaseYear'] != null) {
+      releaseYear = videoData['releaseYear'].toString();
+    } else if (videoData['createdAt'] is Timestamp) {
+      releaseYear = (videoData['createdAt'] as Timestamp).toDate().year.toString();
+    }
+
+    return {
+      'video': videoData,
+      'episodes': episodes,
+      'releaseYear': releaseYear,
+    };
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: SafeArea(
-        child: DefaultTabController(
-          length: 4,
-          child: NestedScrollView(
-            headerSliverBuilder: (context, innerBoxIsScrolled) {
-              return [
-                SliverToBoxAdapter(child: _buildTopCard(context)),
-                SliverToBoxAdapter(child: _buildTitleSection(context)),
-                SliverPersistentHeader(
-                  pinned: true,
-                  delegate: _SliverAppBarDelegate(
-                    TabBar(
-                      controller: _tabController,
-                      indicatorColor: Colors.greenAccent,
-                      labelColor: Colors.white,
-                      unselectedLabelColor: Colors.grey[400],
-                      tabs: const [
-                        Tab(text: 'Episodes'),
-                        Tab(text: 'Collection'),
-                        Tab(text: 'More Like This'),
-                        Tab(text: 'Trailers & More'),
-                      ],
-                    ),
-                  ),
-                ),
-              ];
-            },
-            body: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildEpisodesTab(),
-                _buildCollectionTab(),
-                _buildMoreLikeThisTab(),
-                _buildTrailersTab(),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+    return FutureBuilder(
+      future: _dataFuture,
+      builder: (context, snap) {
+        if (snap.connectionState != ConnectionState.done) {
+          return const Scaffold(
+            backgroundColor: Colors.black,
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
 
-  Widget _buildTopCard(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Stack(
-          children: [
-            // Big hero image
-            AspectRatio(
-              aspectRatio: 16 / 9,
-              child: Container(
-                width: double.infinity,
-                decoration: const BoxDecoration(
-                  image: DecorationImage(
-                    image: AssetImage('assets/hero.jpg'),
-                    fit: BoxFit.cover,
-                  ),
+        if (snap.hasError) {
+          return Scaffold(
+            backgroundColor: Colors.black,
+            body: Center(
+              child: Text(
+                "Error: ${snap.error}",
+                style: const TextStyle(color: Colors.white),
+              ),
+            ),
+          );
+        }
+
+        final data = snap.data!;
+        final video = data['video'];
+        final episodes = data['episodes'];
+        final releaseYear = data['releaseYear'];
+
+        return Scaffold(
+          backgroundColor: Colors.black,
+          body: SafeArea(
+            child: DefaultTabController(
+              length: 4,
+              child: NestedScrollView(
+                headerSliverBuilder: (context, innerBoxScrolled) {
+                  return [
+                    SliverToBoxAdapter(
+                      child: _buildTopCard(video['coverURL'] ?? ''),
+                    ),
+                    SliverToBoxAdapter(
+                      child: _buildTitleSection(
+                        video['title'] ?? '',
+                        releaseYear,
+                        video['description'] ?? '',
+                      ),
+                    ),
+                    SliverPersistentHeader(
+                      pinned: true,
+                      delegate: _SliverAppBarDelegate(
+                        TabBar(
+                          controller: _tabController,
+                          indicatorColor: Colors.greenAccent,
+                          labelColor: Colors.white,
+                          unselectedLabelColor: Colors.grey[500],
+                          tabs: const [
+                            Tab(text: "Episodes"),
+                            Tab(text: "Collection"),
+                            Tab(text: "More Like This"),
+                            Tab(text: "Trailers & More"),
+                          ],
+                        ),
+                      ),
+                    )
+                  ];
+                },
+                body: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildEpisodes(episodes),
+                    const Center(child: Text("Collection", style: TextStyle(color: Colors.white70))),
+                    const Center(child: Text("More Like This", style: TextStyle(color: Colors.white70))),
+                    const Center(child: Text("Trailers & More", style: TextStyle(color: Colors.white70))),
+                  ],
                 ),
               ),
             ),
-            // top-left close button
+          ),
+        );
+      },
+    );
+  }
+
+  // -------------------------------
+  // HERO IMAGE (with coverURL)
+  // -------------------------------
+  Widget _buildTopCard(String coverURL) {
+    return Column(
+      children: [
+        Stack(
+          children: [
+            AspectRatio(
+              aspectRatio: 16 / 9,
+              child: coverURL.isNotEmpty
+                  ? Image.network(coverURL, fit: BoxFit.cover)
+                  : Image.asset("assets/hero.jpg", fit: BoxFit.cover),
+            ),
             Positioned(
-              top: 12,
-              left: 12,
+              top: 10,
+              left: 10,
               child: CircleAvatar(
                 backgroundColor: Colors.black54,
                 child: IconButton(
                   icon: const Icon(Icons.close, color: Colors.white),
-                  onPressed: () => Navigator.of(context).maybePop(),
+                  onPressed: () => Navigator.pop(context),
                 ),
               ),
             ),
-            // cast icon top-right
-            Positioned(
-              top: 12,
-              right: 12,
-              child: CircleAvatar(
-                backgroundColor: Colors.black54,
-                child: IconButton(
-                  icon: const Icon(Icons.cast, color: Colors.white),
-                  onPressed: () {},
-                ),
-              ),
-            ),
-            // center play button overlay
-            Positioned.fill(
-              child: Center(
-                child: Container(
-                  width: 68,
-                  height: 68,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.greenAccent, width: 3),
-                  ),
-                  child: const Icon(Icons.play_arrow, color: Colors.white, size: 36),
-                ),
-              ),
-            ),
-            // Preview text bottom-left in the image
-            Positioned(
-              left: 16,
-              bottom: 12,
-              child: const Text('Preview',
-                  style: TextStyle(color: Colors.white70, fontSize: 16)),
-            ),
+
           ],
         ),
       ],
     );
   }
 
-  Widget _buildTitleSection(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            "Stranger Things ${widget.videoId ?? ''}",
-            style: const TextStyle(
-                color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              _badge('2025'),
-              const SizedBox(width: 8),
-              _pill('U/A'),
-              const SizedBox(width: 8),
-              _pill('4 Seasons'),
-              const SizedBox(width: 8),
-              _pill('HD'),
-            ],
-          ),
-          const SizedBox(height: 12),
-          // Play and download buttons
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.play_arrow),
-                  label: const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 12.0),
-                    child: Text('Play', style: TextStyle(fontSize: 16)),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green[600],
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(6)),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.download_outlined),
-                  label: const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 12.0),
-                    child: Text('Download S1:E1', style: TextStyle(fontSize: 14)),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: Colors.grey[800]!),
-                    backgroundColor: Colors.grey[900],
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            'S1:E1 Chapter One: The Vanishing of Will Byers',
-            style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'On his way home from a friend\'s house, young Will sees something terrifying. Nearby, a sinister secret lurks in the depths of a government lab.',
-            style: TextStyle(color: Colors.white70),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: const [
-              Icon(Icons.check, color: Colors.white, size: 18),
-              SizedBox(width: 8),
-              Text('My List', style: TextStyle(color: Colors.white70)),
-              SizedBox(width: 24),
-              Icon(Icons.thumb_up_outlined, color: Colors.white, size: 18),
-              SizedBox(width: 8),
-              Text('Rate', style: TextStyle(color: Colors.white70)),
-              SizedBox(width: 24),
-              Icon(Icons.share, color: Colors.white, size: 18),
-              SizedBox(width: 8),
-              Text('Share', style: TextStyle(color: Colors.white70)),
-            ],
-          ),
-          const SizedBox(height: 12),
-        ],
-      ),
-    );
-  }
+  // -------------------------------
+  // TITLE + YEAR + PLAY BUTTONS
+  // -------------------------------
+  Widget _buildTitleSection(String title, String year, String description) {
+    final videoData =
+    (_dataFuture as Future<Map<String, dynamic>>)
+    as dynamic; // Not used directly; just for context.
 
-  Widget _buildEpisodesTab() {
-    return ListView.separated(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-      itemCount: episodes.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (context, index) {
-        final ep = episodes[index];
-        return _EpisodeRow(
-          thumb: ep['thumb']!,
-          title: ep['title']!,
-          duration: ep['duration']!,
-          description: ep['description']!,
+    return FutureBuilder(
+      future: _dataFuture,
+      builder: (context, snap) {
+        if (!snap.hasData) return const SizedBox.shrink();
+
+        final video = snap.data!['video'];
+        final summary = video['summary'] ?? '';
+        final fullDescription = video['description'] ?? '';
+        final cast = video['cast'] ?? '';
+        final director = video['director'] ?? '';
+        final producer = video['producer'] ?? '';
+        final writer = video['writer'] ?? '';
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: StatefulBuilder(
+            builder: (context, setInner) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Title
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 26,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  Row(
+                    children: [
+                      _badge(year),
+                      const SizedBox(width: 8),
+                      _pill("HD"),
+                    ],
+                  ),
+
+                  const SizedBox(height: 14),
+
+                  // ------------------------------------------
+                  // SUMMARY (default visible)
+                  // ------------------------------------------
+                  GestureDetector(
+                    onTap: () => setInner(() {}),
+                    child: Text(
+                      summary,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        height: 1.4,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  // Tap to Expand
+                  GestureDetector(
+                    onTap: () => setInner(() {
+                      showFullDescription = !showFullDescription;
+                    }),
+                    child: Text(
+                      showFullDescription ? "Hide Details" : "Show Details",
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+
+                  // ------------------------------------------
+                  // EXPANDED AREA (DESCRIPTION + DETAILS)
+                  // ------------------------------------------
+                  if (showFullDescription) ...[
+                    const SizedBox(height: 12),
+
+                    // Description
+                    Text(
+                      fullDescription,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        height: 1.4,
+                        fontSize: 15,
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // CAST
+                    if (cast.isNotEmpty) ...[
+                      Text(
+                        "Cast:",
+                        style: TextStyle(
+                          color: Colors.grey[200],
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        cast,
+                        style: TextStyle(
+                          color: Colors.grey[400],
+                          fontSize: 14,
+                          height: 1.4,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                    ],
+
+                    // DIRECTOR
+                    if (director.isNotEmpty) ...[
+                      Text(
+                        "Director:",
+                        style: TextStyle(
+                          color: Colors.grey[200],
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        director,
+                        style: TextStyle(
+                          color: Colors.grey[400],
+                          fontSize: 14,
+                          height: 1.4,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                    ],
+
+                    // PRODUCER
+                    if (producer.isNotEmpty) ...[
+                      Text(
+                        "Producer:",
+                        style: TextStyle(
+                          color: Colors.grey[200],
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        producer,
+                        style: TextStyle(
+                          color: Colors.grey[400],
+                          fontSize: 14,
+                          height: 1.4,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                    ],
+
+                    // WRITER
+                    if (writer.isNotEmpty) ...[
+                      Text(
+                        "Writer:",
+                        style: TextStyle(
+                          color: Colors.grey[200],
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        writer,
+                        style: TextStyle(
+                          color: Colors.grey[400],
+                          fontSize: 14,
+                          height: 1.4,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                    ],
+                  ],
+                ],
+              );
+            },
+          ),
         );
       },
     );
   }
 
-  Widget _buildCollectionTab() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Text('Collection tab (placeholder)', style: TextStyle(color: Colors.white70)),
-      ),
+
+  Widget _badge(String text) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    decoration: BoxDecoration(
+        color: Colors.grey[900], borderRadius: BorderRadius.circular(3)),
+    child: Text(text, style: const TextStyle(color: Colors.white70)),
+  );
+
+  Widget _pill(String text) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+    decoration: BoxDecoration(
+        color: Colors.grey[850], borderRadius: BorderRadius.circular(20)),
+    child: Text(text, style: const TextStyle(color: Colors.white70)),
+  );
+
+  // -------------------------------
+  // EPISODES LIST
+  // -------------------------------
+  Widget _buildEpisodes(List episodes) {
+    return ListView.separated(
+      padding: const EdgeInsets.all(14),
+      itemCount: episodes.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 18),
+      itemBuilder: (context, i) {
+        final ep = episodes[i];
+        return _EpisodeRow(
+          thumb: ep['coverURL'] ?? '',
+          title: ep['title'] ?? '',
+          duration: _formatDuration(ep['runtimeSeconds']),
+          description: ep['description'] ?? '',
+        );
+      },
     );
   }
 
-  Widget _buildMoreLikeThisTab() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Text('More like this (placeholder)', style: TextStyle(color: Colors.white70)),
-      ),
-    );
-  }
-
-  Widget _buildTrailersTab() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Text('Trailers & more (placeholder)', style: TextStyle(color: Colors.white70)),
-      ),
-    );
-  }
-
-  Widget _badge(String text) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.grey[900],
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Text(text, style: const TextStyle(color: Colors.white70)),
-    );
-  }
-
-  Widget _pill(String text) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.grey[850],
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(text, style: const TextStyle(color: Colors.white70)),
-    );
+  String _formatDuration(dynamic seconds) {
+    try {
+      int s = int.parse(seconds.toString());
+      return "${s ~/ 60} mins";
+    } catch (_) {
+      return "—";
+    }
   }
 }
 
-class _EpisodeRow extends StatelessWidget {
+// -------------------------------------------------------
+// EPISODE ROW (no download button)
+// -------------------------------------------------------
+class _EpisodeRow extends StatefulWidget {
   final String thumb;
   final String title;
   final String duration;
@@ -349,107 +439,186 @@ class _EpisodeRow extends StatelessWidget {
   }) : super(key: key);
 
   @override
+  State<_EpisodeRow> createState() => _EpisodeRowState();
+}
+
+class _EpisodeRowState extends State<_EpisodeRow> {
+  bool expanded = false;
+
+  @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Stack(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(6),
-              child: Container(
-                width: 110,
-                height: 64,
-                color: Colors.grey[900],
-                child: Image.asset(
-                  thumb,
-                  fit: BoxFit.cover,
-                  errorBuilder: (ctx, _, __) => Container(
-                    color: Colors.grey[800],
-                    child: const Center(child: Icon(Icons.image, color: Colors.white30)),
-                  ),
-                ),
-              ),
-            ),
-            Positioned.fill(
-              child: Align(
-                alignment: Alignment.center,
-                child: Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.black54,
-                    border: Border.all(color: Colors.white24),
-                  ),
-                  child: const Icon(Icons.play_arrow, color: Colors.white),
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          expanded = !expanded;
+        });
+      },
+      behavior: HitTestBehavior.opaque,
+
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // -------------------------------------
+          // Thumbnail + Green Play Icon
+          // -------------------------------------
+          Stack(
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Text(title,
-                        style: const TextStyle(
-                            color: Colors.white, fontWeight: FontWeight.bold)),
-                  ),
-                  Column(
-                    children: [
-                      IconButton(
-                        onPressed: () {},
-                        icon: const Icon(Icons.download_outlined, color: Colors.white70),
-                      ),
-                    ],
-                  )
-                ],
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: Container(
+                  width: 110,
+                  height: 64,
+                  color: Colors.grey[900],
+                  child: widget.thumb.isNotEmpty
+                      ? Image.network(widget.thumb, fit: BoxFit.cover)
+                      : Container(color: Colors.grey[800]),
+                ),
               ),
-              const SizedBox(height: 6),
-              Text(duration, style: const TextStyle(color: Colors.white54, fontSize: 12)),
-              const SizedBox(height: 6),
-              Text(
-                description,
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Colors.white70),
+
+              Positioned.fill(
+                child: Center(
+                  child: Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.greenAccent, width: 2),
+                      color: Colors.black38,
+                    ),
+                    child: const Icon(
+                      Icons.play_arrow,
+                      size: 16,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
-        )
-      ],
+
+          const SizedBox(width: 10),
+
+          // -------------------------------------
+          // Right Text Area (tight Netflix layout)
+          // -------------------------------------
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // -------------------------------------
+                  // TITLE + DOWNLOAD ICON (same line)
+                  // -------------------------------------
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          widget.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+
+                      // Download icon (compact Netflix style)
+                      IconButton(
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(
+                          minWidth: 32,
+                          minHeight: 32,
+                        ),
+                        onPressed: () {},
+                        icon: const Icon(
+                          Icons.download_outlined,
+                          size: 20,
+                          color: Colors.white70,
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // -------------------------------------
+                  // RUNTIME — No spacing above or below
+                  // -------------------------------------
+                  Transform.translate(
+                    offset: const Offset(0, -2), // pulls runtime closer to title
+                    child: Text(
+                      widget.duration,
+                      style: const TextStyle(
+                        color: Colors.white54,
+                        fontSize: 11,
+                        height: 1.0,
+                      ),
+                    ),
+                  ),
+
+                  // -------------------------------------
+                  // DESCRIPTION (expands inline)
+                  // -------------------------------------
+                  AnimatedCrossFade(
+                    firstChild: Text(
+                      widget.description,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                        height: 1.1,
+                      ),
+                    ),
+                    secondChild: Text(
+                      widget.description,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                        height: 1.25,
+                      ),
+                    ),
+                    crossFadeState: expanded
+                        ? CrossFadeState.showSecond
+                        : CrossFadeState.showFirst,
+                    duration: const Duration(milliseconds: 160),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
-// A small helper used to create a pinned TabBar inside NestedScrollView
+
+
+
+
+
+
+// -------------------------------------------------------
+// TabBar Header
+// -------------------------------------------------------
 class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
-  final TabBar _tabBar;
-
-  _SliverAppBarDelegate(this._tabBar);
-
-  @override
-  double get minExtent => _tabBar.preferredSize.height;
+  final TabBar tabBar;
+  _SliverAppBarDelegate(this.tabBar);
 
   @override
-  double get maxExtent => _tabBar.preferredSize.height;
+  double get minExtent => tabBar.preferredSize.height;
 
   @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return Container(
-      color: Colors.black,
-      child: _tabBar,
-    );
+  double get maxExtent => tabBar.preferredSize.height;
+
+  @override
+  Widget build(context, shrinkOffset, overlapsContent) {
+    return Container(color: Colors.black, child: tabBar);
   }
 
   @override
-  bool shouldRebuild(covariant _SliverAppBarDelegate oldDelegate) {
-    return false;
-  }
+  bool shouldRebuild(oldDelegate) => false;
 }

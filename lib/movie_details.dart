@@ -22,14 +22,27 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
 
   bool _isDownloading = false;
   double _downloadProgress = 0.0;
+  bool _showDescription = false;
 
   Future<DocumentSnapshot<Map<String, dynamic>>> getMovieDetails() async {
     return FirebaseFirestore.instance.collection('videos').doc(widget.videoId).get();
   }
 
+  // Format runtime from seconds → hr/min
+  String formatSeconds(int seconds) {
+    if (seconds <= 0) return "N/A";
+
+    final hours = seconds ~/ 3600;
+    final minutes = (seconds % 3600) ~/ 60;
+
+    if (hours > 0 && minutes > 0) return "$hours hr $minutes min";
+    if (hours > 0) return "$hours hr";
+    return "$minutes min";
+  }
+
+  // DOWNLOAD LOGIC
   Future<void> _downloadVideo(String url, String title) async {
     try {
-      // Request storage permissions
       if (Platform.isAndroid) {
         if (await Permission.manageExternalStorage.isDenied) {
           await Permission.manageExternalStorage.request();
@@ -45,9 +58,8 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
       });
 
       final dio = Dio();
-
-      // Choose best directory
       Directory? targetDir;
+
       if (Platform.isAndroid) {
         targetDir = Directory('/storage/emulated/0/Movies');
         if (!await targetDir.exists()) {
@@ -69,9 +81,7 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
         savePath,
         onReceiveProgress: (received, total) {
           if (total != -1) {
-            setState(() {
-              _downloadProgress = received / total;
-            });
+            setState(() => _downloadProgress = received / total);
           }
         },
       );
@@ -81,24 +91,23 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
         _downloadProgress = 0.0;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('✅ Downloaded successfully to: $savePath')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Downloaded to: $savePath')));
     } catch (e) {
       setState(() {
         _isDownloading = false;
         _downloadProgress = 0.0;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ Download failed: $e')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Download failed: $e')));
     }
   }
 
   void _openFullScreenPlayer(String videoUrl, String title, String videoId) {
-    Navigator.of(context).push(
+    Navigator.push(
+      context,
       MaterialPageRoute(
-        builder: (_) => FullScreenPlayerPage(
+        builder: (_) => FullScreenNetflixPlayer(
           videoUrl: videoUrl,
           title: title,
           videoId: videoId,
@@ -107,102 +116,93 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
     );
   }
 
-  Widget _gradientPlayButton(VoidCallback onPressed) {
-    return Container(
+  // ⭐ THIN PLAY BUTTON
+  Widget _playButton(VoidCallback onPressed) {
+    return SizedBox(
       width: double.infinity,
-      height: 48,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        gradient: const LinearGradient(
-          colors: [Colors.black, limeColor],
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-        ),
-      ),
+      height: 44,
       child: ElevatedButton.icon(
+        onPressed: onPressed,
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.transparent,
-          shadowColor: Colors.transparent,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          backgroundColor: limeColor,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          elevation: 0,
         ),
         icon: const Icon(Icons.play_arrow, color: Colors.black),
-        label: const Text(
-          "Play",
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 16),
-        ),
-        onPressed: onPressed,
+        label: const Text("Play", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
       ),
     );
   }
 
-  // ✅ Download button with progress bar BELOW it
-  Widget _downloadSection(String videoUrl, String title) {
+  // ⭐ THIN DOWNLOAD BUTTON
+  Widget _downloadButton(String videoUrl, String title) {
     return Column(
       children: [
         SizedBox(
           width: double.infinity,
-          height: 48,
-          child: OutlinedButton.icon(
+          height: 44,
+          child: ElevatedButton.icon(
             onPressed: _isDownloading ? null : () => _downloadVideo(videoUrl, title),
-            icon: const Icon(Icons.download, color: limeColor),
-            label: const Text(
-              'Download',
-              style: TextStyle(color: limeColor, fontWeight: FontWeight.bold, fontSize: 16),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.grey.shade900,
+              side: const BorderSide(color: Colors.white24, width: 1),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              elevation: 0,
             ),
-            style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: limeColor, width: 2),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
+            icon: const Icon(Icons.download, color: Colors.white),
+            label: Text("Download", style: TextStyle(color: Colors.white.withOpacity(0.9))),
           ),
         ),
 
-        // ✅ Progress bar displayed below button
         if (_isDownloading) ...[
           const SizedBox(height: 10),
           ClipRRect(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(8),
             child: LinearProgressIndicator(
+              minHeight: 6,
               value: _downloadProgress,
               backgroundColor: Colors.white10,
-              valueColor: const AlwaysStoppedAnimation<Color>(limeColor),
-              minHeight: 8,
+              valueColor: const AlwaysStoppedAnimation(limeColor),
             ),
           ),
           const SizedBox(height: 6),
-          Text(
-            'Downloading: ${(_downloadProgress * 100).toStringAsFixed(0)}%',
-            style: const TextStyle(color: Colors.white70, fontSize: 14),
-          ),
-        ],
+          Text("${(_downloadProgress * 100).toStringAsFixed(0)}%", style: const TextStyle(color: Colors.white60)),
+        ]
       ],
     );
   }
 
-  Widget _tag(String text) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(color: Colors.white12, borderRadius: BorderRadius.circular(4)),
-      child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 12)),
-    );
-  }
-
-  Widget _section(String label, String value) {
+  // ⭐ SINGLE LINE SECTION: "Genre: Action, Thriller"
+  Widget _inlineRow(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: RichText(
-        text: TextSpan(
-          text: "$label: ",
-          style: const TextStyle(color: limeColor, fontSize: 16, fontWeight: FontWeight.w600),
-          children: [
-            TextSpan(
-              text: value.isNotEmpty ? value : "N/A",
-              style: const TextStyle(color: Colors.white70, fontSize: 15),
+      padding: const EdgeInsets.only(top: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "$label: ",
+            style: const TextStyle(
+              color: Colors.white54,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
             ),
-          ],
-        ),
+          ),
+
+          Expanded(
+            child: Text(
+              value.isNotEmpty ? value : "N/A",
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 15,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -211,102 +211,100 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
       body: FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
         future: getMovieDetails(),
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator(color: limeColor));
-          }
           if (!snapshot.hasData || !snapshot.data!.exists) {
-            return const Center(child: Text("Movie not found", style: TextStyle(color: Colors.white70)));
+            return const Center(child: CircularProgressIndicator(color: limeColor));
           }
 
           final data = snapshot.data!.data()!;
-          final String title = data['title'] ?? 'Untitled';
-          final String coverURL = data['coverURL'] ?? '';
-          final String videoURL = data['videoURL'] ?? '';
-          final String description = data['description'] ?? '';
-          final String genre = data['genre'] ?? '';
-          final String language = data['language'] ?? '';
-          final String cast = data['cast'] ?? '';
-          final String releaseYear = data['releaseYear'] ?? '';
-          final String runtime = data['runtime']?.toString() ?? '';
+          final title = data['title'] ?? "Untitled";
+          final cover = data['coverURL'] ?? "";
+          final videoUrl = data['videoURL'] ?? "";
+          final summary = data['summary'] ?? "";
+          final description = data['description'] ?? "";
+          final genre = data['genre'] ?? "";
+          final language = data['language'] ?? "";
+          final cast = data['cast'] ?? "";
+          final releaseYear = data['releaseYear'] ?? "";
+          final runtimeSeconds = data['runtimeSeconds'] ?? 0;
+          final runtimeFormatted = formatSeconds(runtimeSeconds);
 
           return CustomScrollView(
             slivers: [
               SliverAppBar(
                 backgroundColor: Colors.black,
                 expandedHeight: 250,
-                floating: false,
                 pinned: true,
-                systemOverlayStyle: SystemUiOverlayStyle.light,
                 leading: IconButton(
                   icon: const Icon(Icons.arrow_back_ios, color: limeColor),
                   onPressed: () => Navigator.pop(context),
                 ),
                 flexibleSpace: FlexibleSpaceBar(
-                  background: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      coverURL.isNotEmpty
-                          ? Image.network(coverURL, fit: BoxFit.cover, width: double.infinity)
-                          : Container(color: Colors.grey.shade900),
-                      Positioned(
-                        child: InkWell(
-                          onTap: () {
-                            if (videoURL.isNotEmpty) _openFullScreenPlayer(videoURL, title, widget.videoId);
-                          },
-                          child: Container(
-                            decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.black54),
-                            padding: const EdgeInsets.all(12),
-                            child: const Icon(Icons.play_arrow, color: limeColor, size: 48),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                  background: cover.isNotEmpty
+                      ? Image.network(cover, fit: BoxFit.cover)
+                      : Container(color: Colors.grey.shade900),
                 ),
               ),
 
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.all(horizontalPadding),
+                  padding: const EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 14),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const SizedBox(height: 16),
                       Text(title,
-                          style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 8),
-                      Row(children: [
-                        Text(releaseYear, style: const TextStyle(color: Colors.white70)),
-                        const SizedBox(width: 8),
-                        _tag("U/A"),
-                        const SizedBox(width: 8),
-                        _tag("HD")
-                      ]),
+                          style: const TextStyle(fontSize: 26, color: Colors.white, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 6),
+                      Text(releaseYear, style: const TextStyle(color: Colors.white70)),
                       const SizedBox(height: 20),
 
-                      _gradientPlayButton(() {
-                        if (videoURL.isNotEmpty) {
-                          _openFullScreenPlayer(videoURL, title, widget.videoId);
-                        } else {
-                          ScaffoldMessenger.of(context)
-                              .showSnackBar(const SnackBar(content: Text("No video URL found")));
+                      _playButton(() {
+                        if (videoUrl.isNotEmpty) {
+                          _openFullScreenPlayer(videoUrl, title, widget.videoId);
                         }
                       }),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 14),
 
-                      _downloadSection(videoURL, title),
-                      const SizedBox(height: 20),
+                      _downloadButton(videoUrl, title),
+                      const SizedBox(height: 24),
 
-                      _section("Description", description),
-                      _section("Genre", genre),
-                      _section("Language", language),
-                      _section("Cast", cast),
-                      _section("Runtime", runtime),
+                      // Summary
+                      const Text(
+                        "Summary:",
+                        style: TextStyle(color: Colors.white54, fontSize: 16, fontWeight: FontWeight.w600),
+                      ),
+                      Text(
+                        summary,
+                        style: const TextStyle(color: Colors.white, fontSize: 15, height: 1.4),
+                      ),
+                      const SizedBox(height: 10),
+
+                      // Show description toggle
+                      GestureDetector(
+                        onTap: () => setState(() => _showDescription = !_showDescription),
+                        child: Text(
+                          _showDescription ? "Hide description" : "Show description",
+                          style: const TextStyle(color: Colors.white54, fontSize: 14),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+
+                      if (_showDescription)
+                        Text(
+                          description,
+                          style: const TextStyle(color: Colors.white70, fontSize: 15, height: 1.4),
+                        ),
+
+                      // ⭐ INLINE FIELDS
+                      _inlineRow("Genre", genre),
+                      _inlineRow("Language", language),
+                      _inlineRow("Cast", cast),
+                      _inlineRow("Runtime", runtimeFormatted),
+
                       const SizedBox(height: 40),
                     ],
                   ),
                 ),
-              ),
+              )
             ],
           );
         },
