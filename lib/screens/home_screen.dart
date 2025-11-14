@@ -4,6 +4,7 @@ import '../movie_details.dart';
 import '../series_details.dart';
 import '../search_page.dart';
 import '../screens/profile_screen.dart';
+import '../screens/download_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   static const String route = '/home';
@@ -19,9 +20,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   final List<Widget> pages = [
     const HomeScreenBody(),
-    // Placeholder for Downloads page
-    const Center(
-        child: Text("Downloads Page", style: TextStyle(color: Colors.white))),
+    const DownloadsPage(),
     const MovieSearchScreen(),
     // Placeholder for Library page. MovieDetailPage requires a videoId,
     // so it cannot be instantiated here directly. You would navigate to it
@@ -191,7 +190,7 @@ class HomeScreenBody extends StatelessWidget {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => seriesdetails(videoId: id),
+                        builder: (context) => SeriesDetails(videoId: id),
                       ),
                     );
                   } else {
