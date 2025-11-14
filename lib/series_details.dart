@@ -383,7 +383,7 @@ class _SeriesDetailsState extends State<SeriesDetails>
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => FullScreenNetflixPlayer(
+        builder: (_) => FullScreenPlayer(
           videoUrl: videoUrl,
           title: title,
           videoId: videoId,
@@ -638,6 +638,7 @@ class _SeriesDetailsState extends State<SeriesDetails>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Expanded(
                               child: Text(
@@ -698,15 +699,12 @@ class _SeriesDetailsState extends State<SeriesDetails>
                         ),
 
                         // ---- Duration ----
-                        Transform.translate(
-                          offset: const Offset(0, -2),
-                          child: Text(
-                            duration,
-                            style: const TextStyle(
-                              color: Colors.white54,
-                              fontSize: 11,
-                              height: 1,
-                            ),
+                        Text(
+                          duration,
+                          style: const TextStyle(
+                            color: Colors.white54,
+                            fontSize: 11,
+                            height: 1,
                           ),
                         ),
 

@@ -107,7 +107,7 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => FullScreenNetflixPlayer(
+        builder: (_) => FullScreenPlayer(
           videoUrl: videoUrl,
           title: title,
           videoId: videoId,
