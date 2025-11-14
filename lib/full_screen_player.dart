@@ -1,4 +1,3 @@
-// full_screen_player.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -40,22 +39,27 @@ class _FullScreenPlayerState extends State<FullScreenPlayer>
   bool _isMuted = false;
   bool _isBuffering = false;
 
-  // double-tap detection
   double? _lastDoubleDx;
-  Offset? _lastDoubleGlobalPos;
 
-  // scrubbing & gestures
   bool _isScrubbing = false;
   double _scrubStartDx = 0.0;
   Duration _scrubStartPos = Duration.zero;
 
-  bool _isVerticalDrag = false;
   bool _verticalRight = false;
   double _dragStartDy = 0.0;
   double _startVal = 0.0;
 
-  // resume save throttle
   int _lastSavedSec = -1;
+
+  // ================= NEW VARIABLES =================
+  double _uiVolumeLevel = 1.0;
+  double _uiBrightnessLevel = 1.0;
+  bool _showVolumeBar = false;
+  bool _showBrightnessBar = false;
+
+  double _zoom = 1.0;
+  double _baseZoom = 1.0;
+  // ==================================================
 
   @override
   void initState() {
@@ -101,101 +105,52 @@ class _FullScreenPlayerState extends State<FullScreenPlayer>
     } catch (_) {}
   }
 
-
-
-  void _debugVideoStatus() {
-    if (_controller == null) return;
-
-    final val = _controller!.value;
-
-    // Log when an error appears
-    if (val.hasError) {
-      print("🔥 VIDEO ERROR: ${val.errorDescription}");
-    }
-
-    // Log duration change
-    if (val.duration.inMilliseconds == 0) {
-      print("⚠ Duration still ZERO — maybe metadata/cors issue");
-    }
-
-    // Log position changes
-    print("▶ position=${val.position.inMilliseconds}, "
-        "duration=${val.duration.inMilliseconds}, "
-        "isPlaying=${val.isPlaying}, "
-        "isBuffering=${val.isBuffering}");
-
-    // Log initialization
-    if (val.isInitialized) {
-      print("🎉 VIDEO INITIALIZED — aspectRatio=${val.aspectRatio}");
-    }
-
-    // Log buffering issues
-    if (val.isBuffering) {
-      print("⏳ BUFFERING...");
-    }
-  }
-
-
-
-
-
-
-  Future<void> _initController() async {
-
-    final resume = await _loadResume();
-    _controller = VideoPlayerController.network(widget.videoUrl);
-    _controller!.addListener(_debugVideoStatus);
-
-    _controller!.addListener(_listener);
-
-    try {
-      await _controller!.initialize();
-    } catch (e) {
-      // failed to init
-    }
-
-    if (resume != null && _controller!.value.isInitialized && resume.inSeconds > 1) {
-      try {
-        await _controller!.seekTo(resume);
-      } catch (_) {}
-    }
-
-    if (_controller!.value.isInitialized) {
-      await _controller!.setPlaybackSpeed(1.0);
-      await _controller!.setVolume(1.0);
-      _playbackSpeed = 1.0;
-      _isMuted = (_controller!.value.volume == 0);
-      await _controller!.play();
-    }
-
-    _startHideTimer();
-    setState(() {});
-  }
-
   void _listener() {
     if (!mounted) return;
-    final v = _controller!.value;
 
-    // buffering state
-    final buffering = v.isBuffering;
-    if (buffering != _isBuffering) {
-      _isBuffering = buffering;
-    }
+    final v = _controller!.value;
+    _isBuffering = v.isBuffering;
 
     if (v.isInitialized) {
       _position = v.position;
-      _duration = v.duration ?? Duration.zero;
+      _duration = v.duration;
       _playbackSpeed = v.playbackSpeed;
       _isMuted = (v.volume <= 0.001);
     }
 
-    // save every 5s
     final sec = _position.inSeconds;
     if (sec > 1 && sec % 5 == 0 && sec != _lastSavedSec) {
       _lastSavedSec = sec;
       _saveResume(_position);
     }
 
+    setState(() {});
+  }
+
+  Future<void> _initController() async {
+    final resume = await _loadResume();
+
+    _controller = VideoPlayerController.network(widget.videoUrl);
+    _controller!.addListener(_listener);
+
+    try {
+      await _controller!.initialize();
+    } catch (_) {}
+
+    if (resume != null &&
+        _controller!.value.isInitialized &&
+        resume.inSeconds > 1) {
+      await _controller!.seekTo(resume);
+    }
+
+    if (_controller!.value.isInitialized) {
+      await _controller!.setPlaybackSpeed(1.0);
+      await _controller!.setVolume(1.0);
+      _isMuted = false;
+      await _controller!.play();
+    }
+
+    _startHideTimer();
     setState(() {});
   }
 
@@ -211,39 +166,34 @@ class _FullScreenPlayerState extends State<FullScreenPlayer>
     if (_controlsVisible) _startHideTimer();
   }
 
-  // double-tap handling: determine side on down event
-  void _onDoubleTapDown(TapDownDetails details) {
-    _lastDoubleDx = details.localPosition.dx;
-    _lastDoubleGlobalPos = details.globalPosition;
+  void _onDoubleTapDown(TapDownDetails d) {
+    _lastDoubleDx = d.localPosition.dx;
   }
 
   void _onDoubleTap() {
     final w = MediaQuery.of(context).size.width;
     final dx = _lastDoubleDx ?? w / 2;
+
     if (dx < w * 0.33) {
-      _safeSeekBy(-10);
+      _safeSeek(-10);
     } else if (dx > w * 0.66) {
-      _safeSeekBy(10);
+      _safeSeek(10);
     } else {
       _toggleControls();
     }
   }
 
-  Future<void> _safeSeekBy(int sec) async {
-    if (_controller == null || !_controller!.value.isInitialized) return;
-    final pos = _controller!.value.position;
-    final dur = _controller!.value.duration ?? Duration.zero;
-    final target = pos + Duration(seconds: sec);
-    final clamped = Duration(milliseconds: target.inMilliseconds.clamp(0, dur.inMilliseconds));
-    await _controller!.seekTo(clamped);
-  }
-
-  Future<void> _setPlaybackSpeed(double v) async {
+  Future<void> _safeSeek(int sec) async {
     if (_controller == null) return;
-    try {
-      await _controller!.setPlaybackSpeed(v);
-      setState(() => _playbackSpeed = v);
-    } catch (_) {}
+
+    final pos = _controller!.value.position;
+    final dur = _controller!.value.duration;
+    final target = pos + Duration(seconds: sec);
+
+    final clamped = Duration(
+        milliseconds: target.inMilliseconds.clamp(0, dur.inMilliseconds));
+
+    await _controller!.seekTo(clamped);
   }
 
   Future<double> _getBrightness() async {
@@ -264,258 +214,277 @@ class _FullScreenPlayerState extends State<FullScreenPlayer>
 
   void _setVolume(double v) {
     if (_controller == null) return;
-    final vol = v.clamp(0.0, 1.0);
-    try {
-      _controller!.setVolume(vol);
-    } catch (_) {}
+    _controller!.setVolume(v.clamp(0.0, 1.0));
   }
 
   String _fmt(Duration d) {
-    final h = d.inHours;
-    final m = d.inMinutes % 60;
+    final m = d.inMinutes;
     final s = d.inSeconds % 60;
-    if (h > 0) return '$h:${m.toString().padLeft(2, "0")}:${s.toString().padLeft(2, "0")}';
-    return '${m}:${s.toString().padLeft(2, "0")}';
+    return "$m:${s.toString().padLeft(2, '0')}";
   }
 
   @override
   Widget build(BuildContext context) {
     final initialized = _controller?.value.isInitialized == true;
-    final pos = initialized ? _position : Duration.zero;
-    final total = initialized ? _duration : Duration.zero;
 
     return Scaffold(
       backgroundColor: Colors.black,
       body: GestureDetector(
         behavior: HitTestBehavior.opaque,
+        onTap: _toggleControls,
         onDoubleTapDown: _onDoubleTapDown,
         onDoubleTap: _onDoubleTap,
-        onTap: _toggleControls,
 
-        // horizontal drag -> scrub
-        onHorizontalDragStart: (d) {
-          if (!initialized) return;
-          _isScrubbing = true;
-          _scrubStartDx = d.localPosition.dx;
-          _scrubStartPos = _position;
-          _hideTimer?.cancel();
+        // ============== PINCH ZOOM ===============
+        onScaleStart: (d) => _baseZoom = _zoom,
+        onScaleUpdate: (d) {
+          setState(() {
+            _zoom = (_baseZoom * d.scale).clamp(1.0, 3.0);
+          });
         },
-        onHorizontalDragUpdate: (d) {
-          if (!_isScrubbing || !initialized) return;
-          final w = MediaQuery.of(context).size.width;
-          final dx = d.localPosition.dx - _scrubStartDx;
-          final fraction = dx / w;
-          final dur = _duration.inMilliseconds;
-          final baseMs = _scrubStartPos.inMilliseconds;
-          final offset = (fraction * dur).toInt();
-          final newMs = (baseMs + offset).clamp(0, dur);
-          _controller!.seekTo(Duration(milliseconds: newMs));
-        },
-        onHorizontalDragEnd: (_) {
-          _isScrubbing = false;
-          _startHideTimer();
-        },
+        // =========================================
 
-        // vertical drag -> brightness / volume
+        // ============== BRIGHTNESS / VOLUME =============
         onVerticalDragStart: (d) async {
-          if (_controller == null) return;
           final w = MediaQuery.of(context).size.width;
           _verticalRight = d.localPosition.dx > w / 2;
           _dragStartDy = d.localPosition.dy;
-          _startVal = _verticalRight ? _getVolume() : await _getBrightness();
-          _hideTimer?.cancel();
+
+          if (_verticalRight) {
+            _uiVolumeLevel = _getVolume();
+            _showVolumeBar = true;
+          } else {
+            _uiBrightnessLevel = await _getBrightness();
+            _showBrightnessBar = true;
+          }
+
+          _startVal = _verticalRight ? _uiVolumeLevel : _uiBrightnessLevel;
+          setState(() {});
         },
+
         onVerticalDragUpdate: (d) async {
           final h = MediaQuery.of(context).size.height;
           final diff = (_dragStartDy - d.localPosition.dy) / h;
+
           if (_verticalRight) {
-            _setVolume(_startVal + diff);
+            final newVol = (_startVal + diff).clamp(0.0, 1.0);
+            _uiVolumeLevel = newVol;
+            _setVolume(newVol);
           } else {
-            await _setBrightness(_startVal + diff);
+            final newB = (_startVal + diff).clamp(0.0, 1.0);
+            _uiBrightnessLevel = newB;
+            await _setBrightness(newB);
           }
+
+          setState(() {});
         },
+
         onVerticalDragEnd: (_) {
-          _startHideTimer();
+          _showBrightnessBar = false;
+          _showVolumeBar = false;
+          setState(() {});
         },
+        // =================================================
 
         child: Stack(
           children: [
-            // Video surface
+            // ===================== VIDEO ======================
             if (initialized)
               Center(
-                child: AspectRatio(
-                  aspectRatio: _controller!.value.aspectRatio,
-                  child: VideoPlayer(_controller!),
+                child: Transform.scale(
+                  scale: _zoom, // zoom applied
+                  child: AspectRatio(
+                    aspectRatio: _controller!.value.aspectRatio,
+                    child: VideoPlayer(_controller!),
+                  ),
                 ),
               )
             else
               const Center(child: CircularProgressIndicator(color: green)),
 
-            // Controls overlay
-            if (_controlsVisible) _buildControls(initialized),
-
-            // Title top-left
-            if (_controlsVisible)
+            // ================= VOLUME BAR ==================
+            if (_showVolumeBar)
               Positioned(
-                top: 16,
-                left: 12,
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.arrow_back, color: Colors.white),
-                      onPressed: () => Navigator.of(context).maybePop(),
+                right: 30,
+                top: MediaQuery.of(context).size.height * 0.25,
+                child: Container(
+                  width: 36,
+                  height: MediaQuery.of(context).size.height * 0.45,
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.black54,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: RotatedBox(
+                    quarterTurns: -1,
+                    child: LinearProgressIndicator(
+                      value: _uiVolumeLevel,
+                      color: green,
+                      backgroundColor: Colors.white24,
                     ),
-                    const SizedBox(width: 8),
-                    Text(widget.title,
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                  ],
+                  ),
                 ),
               ),
+
+            // =============== BRIGHTNESS BAR ==================
+            if (_showBrightnessBar)
+              Positioned(
+                left: 30,
+                top: MediaQuery.of(context).size.height * 0.25,
+                child: Container(
+                  width: 36,
+                  height: MediaQuery.of(context).size.height * 0.45,
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.black54,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: RotatedBox(
+                    quarterTurns: -1,
+                    child: LinearProgressIndicator(
+                      value: _uiBrightnessLevel,
+                      color: Colors.yellowAccent,
+                      backgroundColor: Colors.white24,
+                    ),
+                  ),
+                ),
+              ),
+
+            // ===================== CONTROLS ====================
+            if (_controlsVisible) ...[
+              _buildTopBar(),
+              _buildCenterPlayPause(),
+              _buildBottomBar(initialized),
+            ]
           ],
         ),
       ),
     );
   }
 
-  Widget _buildControls(bool initialized) {
-    final pos = initialized ? _position : Duration.zero;
-    final total = initialized ? _duration : Duration.zero;
-    final sliderValue = initialized ? pos.inMilliseconds.clamp(0, total.inMilliseconds).toDouble() : 0.0;
-    final sliderMax = (initialized && total.inMilliseconds > 0) ? total.inMilliseconds.toDouble() : 1.0;
+  // ---------------- TOP BAR ----------------
+  Widget _buildTopBar() {
+    return Positioned(
+      top: 16,
+      left: 12,
+      right: 12,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.arrow_back, color: Colors.white),
+                onPressed: () => Navigator.pop(context),
+              ),
+              Text(
+                widget.title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 16,
+                ),
+              ),
+            ],
+          ),
+          Row(
+            children: [
+              IconButton(
+                icon:
+                Icon(_isMuted ? Icons.volume_off : Icons.volume_up, color: green),
+                onPressed: () => _setVolume(_isMuted ? 1.0 : 0.0),
+              ),
+              PopupMenuButton<double>(
+                color: Colors.black87,
+                onSelected: (v) {
+                  _controller!.setPlaybackSpeed(v);
+                  setState(() => _playbackSpeed = v);
+                },
+                itemBuilder: (_) => const [
+                  PopupMenuItem(value: 0.5, child: Text("0.5x")),
+                  PopupMenuItem(value: 1.0, child: Text("1.0x")),
+                  PopupMenuItem(value: 1.5, child: Text("1.5x")),
+                  PopupMenuItem(value: 2.0, child: Text("2.0x")),
+                ],
+                child: Text(
+                  "${_playbackSpeed.toStringAsFixed(2)}x",
+                  style: const TextStyle(
+                      color: green, fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 
-    return AnimatedOpacity(
-      duration: const Duration(milliseconds: 200),
-      opacity: _controlsVisible ? 1 : 0,
+  // ---------------- CENTER PLAY BUTTON ----------------
+  Widget _buildCenterPlayPause() {
+    return Center(
+      child: GestureDetector(
+        onTap: () {
+          if (_controller!.value.isPlaying) {
+            _controller!.pause();
+          } else {
+            _controller!.play();
+            _startHideTimer();
+          }
+          setState(() {});
+        },
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.black38,
+            border: Border.all(color: Colors.white30),
+          ),
+          child: Icon(
+            _controller?.value.isPlaying ?? false
+                ? Icons.pause
+                : Icons.play_arrow,
+            color: green,
+            size: 34,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ---------------- BOTTOM BAR ----------------
+  Widget _buildBottomBar(bool initialized) {
+    final pos = initialized ? _position : Duration.zero;
+    final dur = initialized ? _duration : Duration.zero;
+
+    return Positioned(
+      bottom: 18,
+      left: 12,
+      right: 12,
       child: Column(
         children: [
-          const SizedBox(height: 36),
-          // top-right controls (mute + speed)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Row(
-              children: [
-                const Spacer(),
-                IconButton(
-                  icon: Icon(_isMuted ? Icons.volume_off : Icons.volume_up, color: green),
-                  onPressed: () {
-                    final newMuted = !_isMuted;
-                    _setVolume(newMuted ? 0.0 : 1.0);
-                    // _isMuted will update via listener
-                  },
-                ),
-                PopupMenuButton<double>(
-                  color: Colors.black87,
-                  onSelected: (v) => _setPlaybackSpeed(v),
-                  itemBuilder: (_) => const [
-                    PopupMenuItem(value: 0.5, child: Text("0.5x")),
-                    PopupMenuItem(value: 1.0, child: Text("1.0x")),
-                    PopupMenuItem(value: 1.25, child: Text("1.25x")),
-                    PopupMenuItem(value: 1.5, child: Text("1.5x")),
-                    PopupMenuItem(value: 2.0, child: Text("2.0x")),
-                  ],
-                  child: Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Text("${_playbackSpeed.toStringAsFixed(2)}x",
-                        style: const TextStyle(color: green, fontWeight: FontWeight.bold)),
-                  ),
-                ),
-              ],
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              trackHeight: 3,
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
+              overlayShape: SliderComponentShape.noOverlay,
+            ),
+            child: Slider(
+              min: 0,
+              max: dur.inMilliseconds.toDouble().clamp(1, double.infinity),
+              value:
+              pos.inMilliseconds.clamp(0, dur.inMilliseconds).toDouble(),
+              activeColor: green,
+              inactiveColor: Colors.white24,
+              onChanged: (v) =>
+                  _controller!.seekTo(Duration(milliseconds: v.toInt())),
             ),
           ),
-
-          const Spacer(),
-
-          // center play/pause
-          GestureDetector(
-            onTap: () async {
-              if (_controller == null || !_controller!.value.isInitialized) return;
-              if (_controller!.value.isPlaying) {
-                await _controller!.pause();
-              } else {
-                await _controller!.play();
-                _startHideTimer();
-              }
-              setState(() {});
-            },
-            child: Container(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.black38,
-                border: Border.all(color: Colors.white30),
-              ),
-              padding: const EdgeInsets.all(12),
-              child: Icon(
-                (_controller?.value.isPlaying ?? false) ? Icons.pause : Icons.play_arrow,
-                color: green,
-                size: 48,
-              ),
-            ),
-          ),
-
-          const Spacer(),
-
-          // bottom: thin slider + times + next/prev
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 18),
-            child: Column(
-              children: [
-                // thin bar: placeholder until initialized
-                if (!initialized || total.inMilliseconds == 0)
-                  Container(height: 3, color: Colors.white12, width: double.infinity)
-                else
-                  SliderTheme(
-                    data: SliderTheme.of(context).copyWith(
-                      trackHeight: 3,
-                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
-                      overlayShape: SliderComponentShape.noOverlay,
-                    ),
-                    child: Slider(
-                      min: 0,
-                      max: sliderMax,
-                      value: sliderValue,
-                      activeColor: green,
-                      inactiveColor: Colors.white24,
-                      onChanged: (v) {
-                        // live seek while dragging slider
-                        if (_controller == null) return;
-                        _controller!.seekTo(Duration(milliseconds: v.toInt()));
-                        setState(() {});
-                      },
-                    ),
-                  ),
-
-                const SizedBox(height: 6),
-
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(_fmt(pos), style: const TextStyle(color: Colors.white70)),
-                    Text(_fmt(total), style: const TextStyle(color: Colors.white70)),
-                  ],
-                ),
-
-                const SizedBox(height: 10),
-
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (widget.onPrevious != null)
-                      IconButton(
-                        icon: const Icon(Icons.skip_previous, color: green, size: 32),
-                        onPressed: widget.onPrevious,
-                      ),
-                    const SizedBox(width: 24),
-                    if (widget.onNext != null)
-                      IconButton(
-                        icon: const Icon(Icons.skip_next, color: green, size: 32),
-                        onPressed: widget.onNext,
-                      ),
-                  ],
-                ),
-
-                const SizedBox(height: 12),
-              ],
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(_fmt(pos), style: const TextStyle(color: Colors.white70)),
+              Text(_fmt(dur), style: const TextStyle(color: Colors.white70)),
+            ],
           ),
         ],
       ),
