@@ -101,9 +101,51 @@ class _FullScreenPlayerState extends State<FullScreenPlayer>
     } catch (_) {}
   }
 
+
+
+  void _debugVideoStatus() {
+    if (_controller == null) return;
+
+    final val = _controller!.value;
+
+    // Log when an error appears
+    if (val.hasError) {
+      print("🔥 VIDEO ERROR: ${val.errorDescription}");
+    }
+
+    // Log duration change
+    if (val.duration.inMilliseconds == 0) {
+      print("⚠ Duration still ZERO — maybe metadata/cors issue");
+    }
+
+    // Log position changes
+    print("▶ position=${val.position.inMilliseconds}, "
+        "duration=${val.duration.inMilliseconds}, "
+        "isPlaying=${val.isPlaying}, "
+        "isBuffering=${val.isBuffering}");
+
+    // Log initialization
+    if (val.isInitialized) {
+      print("🎉 VIDEO INITIALIZED — aspectRatio=${val.aspectRatio}");
+    }
+
+    // Log buffering issues
+    if (val.isBuffering) {
+      print("⏳ BUFFERING...");
+    }
+  }
+
+
+
+
+
+
   Future<void> _initController() async {
+
     final resume = await _loadResume();
     _controller = VideoPlayerController.network(widget.videoUrl);
+    _controller!.addListener(_debugVideoStatus);
+
     _controller!.addListener(_listener);
 
     try {
