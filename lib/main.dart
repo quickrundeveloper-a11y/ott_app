@@ -5,7 +5,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:ott_app/screens/complete_profile_screen.dart';
 import 'package:ott_app/screens/home_screen.dart';
 import 'package:ott_app/screens/login_screen.dart';
+import 'package:ott_app/theme/theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 
 
 
@@ -74,35 +76,10 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
-    const lime = Color(0xFFB6FF3B);
-    final colorScheme = ColorScheme.fromSeed(seedColor: lime, brightness: Brightness.dark);
-
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'OTT App',
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: colorScheme,
-        scaffoldBackgroundColor: Colors.black,
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: const Color(0xFF1E1E1E),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: Color(0xFF2A2A2A)),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: Color(0xFF2A2A2A)),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: lime, width: 1.6),
-          ),
-          hintStyle: const TextStyle(color: Color(0xFFBEBEBE)),
-          labelStyle: const TextStyle(color: Color(0xFFE8E8E8)),
-        ),
-      ),
+      theme: AppTheme.mainTheme(),
       // Use `home` to show the decided start screen (no '/' routes conflict).
       home: _startScreen ?? const SplashScreen(),
       // Do NOT include '/' inside routes when using `home:`

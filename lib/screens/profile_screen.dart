@@ -1,17 +1,64 @@
 import 'package:flutter/material.dart';
-import 'package:ott_app/screens/login_screen.dart';
-import 'package:ott_app/screens/policy.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:ott_app/screens/Change_password.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'edit_profile.dart';
-import 'help_center.dart';
-import 'notification.dart';
-import 'download_page.dart';
+
+import '../theme/theme.dart';
+import 'login_screen.dart';
+import 'policy.dart';
 
 
-class ProfilePage extends StatelessWidget {
+class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
 
+  @override
+  State<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
+  String firstName = "";
+  String lastName = "";
+  String email = "";
+  String profileImage = "";
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    loadUserData();
+  }
+
+  // ---------------- LOAD USER DATA FROM FIRESTORE ----------------
+  Future<void> loadUserData() async {
+    final prefs = await SharedPreferences.getInstance();
+    final uid = prefs.getString("uid"); // stored at login
+
+    if (uid == null) {
+      setState(() => isLoading = false);
+      return;
+    }
+
+    final userDoc =
+    await FirebaseFirestore.instance.collection("users").doc(uid).get();
+
+    if (userDoc.exists) {
+      final data = userDoc.data() as Map<String, dynamic>;
+
+      setState(() {
+        firstName = data["firstName"] ?? "";
+        lastName = data["lastName"] ?? "";
+        email = data["email"] ?? "";
+        profileImage = data["profileImage"] ??
+            ""; // Firebase storage URL OR empty (if none)
+        isLoading = false;
+      });
+    } else {
+      setState(() => isLoading = false);
+    }
+  }
+
+  // ----------------- LOGOUT -----------------
   Future<void> _logout(BuildContext context) async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.clear();
@@ -27,115 +74,97 @@ class ProfilePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const limeColor = Color(0xFFB6FF3B);
-
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: AppTheme.background,
       appBar: AppBar(
-        backgroundColor: Colors.black,
+        backgroundColor: AppTheme.background,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: limeColor),
-          onPressed: () => Navigator.pop(context),
-        ),
+        automaticallyImplyLeading: false,
         title: const Text(
           "Profile",
           style: TextStyle(
-            color: limeColor,
+            color: AppTheme.greenAccent,
             fontWeight: FontWeight.bold,
           ),
         ),
         centerTitle: true,
       ),
 
-      body: Padding(
+      // ---------------- MAIN BODY ----------------
+      body: isLoading
+          ? const Center(
+        child: CircularProgressIndicator(color: AppTheme.textWhite),
+      )
+          : Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20),
         child: SingleChildScrollView(
           child: Column(
             children: [
               const SizedBox(height: 30),
 
-              Stack(
-                alignment: Alignment.center,
-                children: [
-                  const CircleAvatar(
-                    radius: 55,
-                    backgroundImage: AssetImage('assets/user.jpg'),
-                  ),
-                  Positioned(
-                    bottom: 2,
-                    right: 4,
-                    child: CircleAvatar(
-                      radius: 18,
-                      backgroundColor: limeColor,
-                      child: const Icon(Icons.edit, color: Colors.black),
-                    ),
-                  ),
-                ],
+              // ---------------- PROFILE AVATAR ----------------
+            CircleAvatar(
+              radius: 60,
+              backgroundColor: AppTheme.cardDark,
+              child: const Icon(
+                Icons.person,
+                color: AppTheme.textLight,
+                size: 55,
               ),
+            ),
+
 
               const SizedBox(height: 16),
-              const Text(
-                "Alexandar Golap",
-                style: TextStyle(color: Colors.white, fontSize: 22),
+
+              // ---------------- NAME ----------------
+              Text(
+                "$firstName $lastName",
+                style: const TextStyle(
+                  color: AppTheme.textWhite,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
-              const Text(
-                "username@website.com",
-                style: TextStyle(color: Colors.white70),
+
+              // ---------------- EMAIL ----------------
+              Text(
+                email,
+                style:
+                const TextStyle(color: AppTheme.textLight, fontSize: 14),
               ),
 
               const SizedBox(height: 30),
 
-              _buildMenuItem(Icons.person, "Edit Profile", onTap: () {
+              // ---------------- MENU ITEMS ----------------
+              _buildMenuItem(Icons.lock_outline, "Change Password", onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const EditProfilePage()),
+                  MaterialPageRoute(
+                      builder: (_) => const ChangePasswordPage()),
                 );
               }),
-
-              _buildMenuItem(Icons.notifications, "Notifications", onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const NotificationPage()),
-                );
-              }),
-
-              _buildMenuItem(Icons.download, "Downloads", onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const DownloadPage()),
-                );
-              }),
-
-              _buildMenuItem(Icons.security, "Security"),
 
               _buildMenuItem(Icons.language, "Language",
                   trailing: "English (India)"),
 
-              _buildMenuItem(Icons.help_outline, "Help Center", onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const HelpCenterPage()),
-                );
-              }),
-
-              // ⭐ FIXED: PRIVACY POLICY NAVIGATION
               _buildMenuItem(Icons.privacy_tip_outlined, "Privacy Policy",
                   onTap: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const PrivacyPolicyPage()),
+                      MaterialPageRoute(
+                          builder: (_) => const PrivacyPolicyPage()),
                     );
                   }),
 
               const SizedBox(height: 20),
 
+              // ---------------- LOGOUT ----------------
               ListTile(
-                leading: const Icon(Icons.logout, color: limeColor),
+                leading: const Icon(Icons.logout, color: AppTheme.greenAccent),
                 title: const Text(
                   "Logout",
                   style: TextStyle(
-                    color: limeColor,
+                    color: AppTheme.greenAccent,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -150,34 +179,31 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
+  // ----------------- MENU ITEM BUILDER -----------------
   static Widget _buildMenuItem(
       IconData icon,
       String title, {
         String? trailing,
         VoidCallback? onTap,
       }) {
-
-    const limeColor = Color(0xFFB6FF3B);
-
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.grey[900],
+        color: AppTheme.cardDark,
         borderRadius: BorderRadius.circular(12),
       ),
       child: ListTile(
-        leading: Icon(icon, color: limeColor),
+        leading: Icon(icon, color: AppTheme.greenAccent),
         title: Text(
           title,
-          style: const TextStyle(color: Colors.white),
+          style: const TextStyle(color: AppTheme.textWhite),
         ),
         trailing: trailing != null
             ? Text(
           trailing,
-          style: const TextStyle(color: Colors.white60),
+          style: const TextStyle(color: AppTheme.textLight),
         )
-            : const Icon(Icons.arrow_forward_ios,
-            size: 16, color: Colors.white54),
+            : const Icon(Icons.arrow_forward_ios, size: 16, color: AppTheme.textGrey),
         onTap: onTap,
       ),
     );

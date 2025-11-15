@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:ott_app/theme/theme.dart';
 import 'package:video_player/video_player.dart';
 import 'package:screen_brightness/screen_brightness.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 
 class FullScreenPlayer extends StatefulWidget {
   final String videoUrl;
@@ -27,8 +29,6 @@ class FullScreenPlayer extends StatefulWidget {
 
 class _FullScreenPlayerState extends State<FullScreenPlayer>
     with SingleTickerProviderStateMixin {
-  static const Color green = Color(0xFF00FF66);
-
   VideoPlayerController? _controller;
   bool _controlsVisible = true;
   Timer? _hideTimer;
@@ -228,7 +228,7 @@ class _FullScreenPlayerState extends State<FullScreenPlayer>
     final initialized = _controller?.value.isInitialized == true;
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: AppTheme.background,
       body: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: _toggleControls,
@@ -300,7 +300,8 @@ class _FullScreenPlayerState extends State<FullScreenPlayer>
                 ),
               )
             else
-              const Center(child: CircularProgressIndicator(color: green)),
+              const Center(
+                  child: CircularProgressIndicator(color: AppTheme.greenAccent)),
 
             // ================= VOLUME BAR ==================
             if (_showVolumeBar)
@@ -312,14 +313,14 @@ class _FullScreenPlayerState extends State<FullScreenPlayer>
                   height: MediaQuery.of(context).size.height * 0.45,
                   padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
-                    color: Colors.black54,
+                    color: AppTheme.cardDark.withOpacity(0.7),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: RotatedBox(
                     quarterTurns: -1,
                     child: LinearProgressIndicator(
                       value: _uiVolumeLevel,
-                      color: green,
+                      color: AppTheme.greenAccent,
                       backgroundColor: Colors.white24,
                     ),
                   ),
@@ -336,7 +337,7 @@ class _FullScreenPlayerState extends State<FullScreenPlayer>
                   height: MediaQuery.of(context).size.height * 0.45,
                   padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
-                    color: Colors.black54,
+                    color: AppTheme.cardDark.withOpacity(0.7),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: RotatedBox(
@@ -374,13 +375,13 @@ class _FullScreenPlayerState extends State<FullScreenPlayer>
           Row(
             children: [
               IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.white),
+                icon: const Icon(Icons.arrow_back, color: AppTheme.textWhite),
                 onPressed: () => Navigator.pop(context),
               ),
               Text(
                 widget.title,
                 style: const TextStyle(
-                  color: Colors.white,
+                  color: AppTheme.textWhite,
                   fontWeight: FontWeight.w600,
                   fontSize: 16,
                 ),
@@ -390,12 +391,12 @@ class _FullScreenPlayerState extends State<FullScreenPlayer>
           Row(
             children: [
               IconButton(
-                icon:
-                Icon(_isMuted ? Icons.volume_off : Icons.volume_up, color: green),
+                icon: Icon(_isMuted ? Icons.volume_off : Icons.volume_up,
+                    color: AppTheme.greenAccent),
                 onPressed: () => _setVolume(_isMuted ? 1.0 : 0.0),
               ),
               PopupMenuButton<double>(
-                color: Colors.black87,
+                color: AppTheme.cardDarker,
                 onSelected: (v) {
                   _controller!.setPlaybackSpeed(v);
                   setState(() => _playbackSpeed = v);
@@ -409,7 +410,9 @@ class _FullScreenPlayerState extends State<FullScreenPlayer>
                 child: Text(
                   "${_playbackSpeed.toStringAsFixed(2)}x",
                   style: const TextStyle(
-                      color: green, fontWeight: FontWeight.bold, fontSize: 14),
+                      color: AppTheme.greenAccent,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14),
                 ),
               ),
             ],
@@ -436,14 +439,14 @@ class _FullScreenPlayerState extends State<FullScreenPlayer>
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: Colors.black38,
-            border: Border.all(color: Colors.white30),
+            color: AppTheme.cardDark.withOpacity(0.5),
+            border: Border.all(color: AppTheme.borderColor),
           ),
           child: Icon(
             _controller?.value.isPlaying ?? false
                 ? Icons.pause
                 : Icons.play_arrow,
-            color: green,
+            color: AppTheme.greenAccent,
             size: 34,
           ),
         ),
@@ -473,8 +476,8 @@ class _FullScreenPlayerState extends State<FullScreenPlayer>
               max: dur.inMilliseconds.toDouble().clamp(1, double.infinity),
               value:
               pos.inMilliseconds.clamp(0, dur.inMilliseconds).toDouble(),
-              activeColor: green,
-              inactiveColor: Colors.white24,
+              activeColor: AppTheme.greenAccent,
+              inactiveColor: AppTheme.borderColor,
               onChanged: (v) =>
                   _controller!.seekTo(Duration(milliseconds: v.toInt())),
             ),
@@ -482,7 +485,7 @@ class _FullScreenPlayerState extends State<FullScreenPlayer>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(_fmt(pos), style: const TextStyle(color: Colors.white70)),
+              Text(_fmt(pos), style: const TextStyle(color: AppTheme.textLight)),
               Text(_fmt(dur), style: const TextStyle(color: Colors.white70)),
             ],
           ),

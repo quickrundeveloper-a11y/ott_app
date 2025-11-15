@@ -7,8 +7,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../theme/theme.dart';
 import 'complete_profile_screen.dart';
 import 'home_screen.dart';
+
 
 /// ---------------------
 /// AuthService
@@ -245,10 +247,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const lime = Color(0xFFB6FF3B);
-
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: AppTheme.background,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
@@ -258,106 +258,88 @@ class _LoginScreenState extends State<LoginScreen> {
               const Text(
                 'Welcome !',
                 style: TextStyle(
-                    color: lime, fontSize: 36, fontWeight: FontWeight.w800),
+                    color: AppTheme.greenAccent, fontSize: 36, fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 28),
 
               Form(
                 key: _formKey,
-                child: Column(
+                child: Column( // Use a container for consistent styling
                   children: [
-                    TextFormField(
-                      controller: _email,
-                      keyboardType: TextInputType.emailAddress,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: InputDecoration(
-                        hintText: 'Enter your Email',
-                        filled: true,
-                        fillColor: const Color(0xFF1E1E1E),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(color: lime, width: 1.6),
-                        ),
-                        prefixIcon:
-                        const Icon(Icons.email_outlined, color: Colors.white70),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: AppTheme.cardDark,
+                        borderRadius: BorderRadius.circular(14),
                       ),
-                      validator: (v) {
-                        final text = v?.trim() ?? '';
-                        if (text.isEmpty) return 'Email required';
-                        if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(text)) {
-                          return 'Enter a valid email';
-                        }
-                        return null;
-                      },
+                      child: TextFormField(
+                        controller: _email,
+                        keyboardType: TextInputType.emailAddress,
+                        style: const TextStyle(color: AppTheme.textWhite),
+                        decoration: AppTheme.inputDecoration(
+                          hint: 'Enter your Email',
+                          suffix: const Icon(Icons.email_outlined, color: AppTheme.textGrey),
+                        ),
+                        validator: (v) {
+                          final text = v?.trim() ?? '';
+                          if (text.isEmpty) return 'Email required';
+                          if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(text)) {
+                            return 'Enter a valid email';
+                          }
+                          return null;
+                        },
+                      ),
                     ),
                     const SizedBox(height: 16),
 
-                    TextFormField(
-                      controller: _password,
-                      obscureText: _obscure,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: InputDecoration(
-                        hintText: 'Enter Password',
-                        filled: true,
-                        fillColor: const Color(0xFF1E1E1E),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(color: lime, width: 1.6),
-                        ),
-                        prefixIcon: const Icon(Icons.lock_outline,
-                            color: Colors.white70),
-                        suffixIcon: IconButton(
-                          onPressed: () =>
-                              setState(() => _obscure = !_obscure),
-                          icon: Icon(
-                              _obscure
-                                  ? Icons.visibility
-                                  : Icons.visibility_off,
-                              color: Colors.white70),
-                        ),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: AppTheme.cardDark,
+                        borderRadius: BorderRadius.circular(14),
                       ),
-                      validator: (v) {
-                        if ((v ?? '').isEmpty) return 'Password required';
-                        if ((v ?? '').length < 6) return 'Min 6 characters';
-                        return null;
-                      },
+                      child: TextFormField(
+                        controller: _password,
+                        obscureText: _obscure,
+                        style: const TextStyle(color: AppTheme.textWhite),
+                        decoration: AppTheme.inputDecoration(
+                          hint: 'Enter Password',
+                          suffix: IconButton(
+                            onPressed: () => setState(() => _obscure = !_obscure),
+                            icon: Icon(
+                                _obscure ? Icons.visibility : Icons.visibility_off,
+                                color: AppTheme.textGrey),
+                          ),
+                        ),
+                        validator: (v) {
+                          if ((v ?? '').isEmpty) return 'Password required';
+                          if ((v ?? '').length < 6) return 'Min 6 characters';
+                          return null;
+                        },
+                      ),
                     ),
 
                     if (_isNewUser)
                       Padding(
                         padding: const EdgeInsets.only(top: 16),
-                        child: TextFormField(
-                          controller: _confirm,
-                          obscureText: _obscureConfirm,
-                          style: const TextStyle(color: Colors.white),
-                          decoration: InputDecoration(
-                            hintText: 'Confirm Password',
-                            filled: true,
-                            fillColor: const Color(0xFF1E1E1E),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
-                              borderSide:
-                              const BorderSide(color: lime, width: 1.6),
-                            ),
-                            prefixIcon: const Icon(Icons.lock_outline,
-                                color: Colors.white70),
-                            suffixIcon: IconButton(
-                              onPressed: () => setState(
-                                      () => _obscureConfirm = !_obscureConfirm),
-                              icon: Icon(
-                                  _obscureConfirm
-                                      ? Icons.visibility
-                                      : Icons.visibility_off,
-                                  color: Colors.white70),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: AppTheme.cardDark,
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: TextFormField(
+                            controller: _confirm,
+                            obscureText: _obscureConfirm,
+                            style: const TextStyle(color: AppTheme.textWhite),
+                            decoration: AppTheme.inputDecoration(
+                              hint: 'Confirm Password',
+                              suffix: IconButton(
+                                onPressed: () =>
+                                    setState(() => _obscureConfirm = !_obscureConfirm),
+                                icon: Icon(
+                                    _obscureConfirm
+                                        ? Icons.visibility
+                                        : Icons.visibility_off,
+                                    color: AppTheme.textGrey),
+                              ),
                             ),
                           ),
                         ),
@@ -373,7 +355,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     value: _acceptedTerms,
                     onChanged: (v) =>
                         setState(() => _acceptedTerms = v ?? false),
-                    activeColor: lime,
+                    activeColor: AppTheme.greenAccent,
                   ),
                   const Expanded(
                     child: Text('Accept Terms & Conditions',
@@ -387,8 +369,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 height: 54,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor:
-                    _acceptedTerms ? lime : const Color(0xFF2B2B2B),
+                    backgroundColor: _acceptedTerms
+                        ? AppTheme.greenAccent
+                        : AppTheme.cardDarker,
                     foregroundColor: Colors.black,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14)),
@@ -409,14 +392,22 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 16),
               const Center(
                   child: Text('OR',
-                      style: TextStyle(color: Color(0xFFBEBEBE)))),
+                      style: TextStyle(color: AppTheme.textGrey))),
               const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
                 height: 54,
                 child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: AppTheme.borderColor),
+                    foregroundColor: AppTheme.textLight,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
                   onPressed: _loading ? null : _handleGoogleLogin,
-                  icon: const Icon(Icons.account_circle_outlined),
+                  icon:
+                      const Icon(Icons.account_circle_outlined, color: AppTheme.textLight),
                   label: const Text('Continue with Google'),
                 ),
               ),
@@ -427,3 +418,4 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
+

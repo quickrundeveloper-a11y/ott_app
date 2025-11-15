@@ -4,9 +4,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:dio/dio.dart';
+import 'package:ott_app/theme/theme.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';
 import 'full_screen_player.dart';
+
 
 class MovieDetailPage extends StatefulWidget {
   final String videoId;
@@ -17,7 +19,6 @@ class MovieDetailPage extends StatefulWidget {
 }
 
 class _MovieDetailPageState extends State<MovieDetailPage> {
-  static const Color limeColor = Color(0xFFB6FF3B);
   static const double horizontalPadding = 18.0;
 
   bool _isDownloading = false;
@@ -124,7 +125,7 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
       child: ElevatedButton.icon(
         onPressed: onPressed,
         style: ElevatedButton.styleFrom(
-          backgroundColor: limeColor,
+          backgroundColor: AppTheme.greenAccent,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           elevation: 0,
         ),
@@ -144,13 +145,13 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
           child: ElevatedButton.icon(
             onPressed: _isDownloading ? null : () => _downloadVideo(videoUrl, title),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.grey.shade900,
-              side: const BorderSide(color: Colors.white24, width: 1),
+              backgroundColor: AppTheme.cardDark,
+              side: const BorderSide(color: AppTheme.borderColor, width: 1),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               elevation: 0,
             ),
-            icon: const Icon(Icons.download, color: Colors.white),
-            label: Text("Download", style: TextStyle(color: Colors.white.withOpacity(0.9))),
+            icon: const Icon(Icons.download, color: AppTheme.textWhite),
+            label: Text("Download", style: TextStyle(color: AppTheme.textWhite.withOpacity(0.9))),
           ),
         ),
 
@@ -162,11 +163,11 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
               minHeight: 6,
               value: _downloadProgress,
               backgroundColor: Colors.white10,
-              valueColor: const AlwaysStoppedAnimation(limeColor),
+              valueColor: const AlwaysStoppedAnimation(AppTheme.greenAccent),
             ),
           ),
           const SizedBox(height: 6),
-          Text("${(_downloadProgress * 100).toStringAsFixed(0)}%", style: const TextStyle(color: Colors.white60)),
+          Text("${(_downloadProgress * 100).toStringAsFixed(0)}%", style: const TextStyle(color: AppTheme.textLight)),
         ]
       ],
     );
@@ -182,7 +183,7 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
           Text(
             "$label: ",
             style: const TextStyle(
-              color: Colors.white54,
+              color: AppTheme.textGrey,
               fontSize: 16,
               fontWeight: FontWeight.w600,
             ),
@@ -192,7 +193,7 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
             child: Text(
               value.isNotEmpty ? value : "N/A",
               style: const TextStyle(
-                color: Colors.white,
+                color: AppTheme.textWhite,
                 fontSize: 15,
                 height: 1.4,
               ),
@@ -207,12 +208,12 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: AppTheme.background,
       body: FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
         future: getMovieDetails(),
         builder: (context, snapshot) {
           if (!snapshot.hasData || !snapshot.data!.exists) {
-            return const Center(child: CircularProgressIndicator(color: limeColor));
+            return const Center(child: CircularProgressIndicator(color: AppTheme.greenAccent));
           }
 
           final data = snapshot.data!.data()!;
@@ -231,11 +232,11 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
           return CustomScrollView(
             slivers: [
               SliverAppBar(
-                backgroundColor: Colors.black,
+                backgroundColor: AppTheme.background,
                 expandedHeight: 250,
                 pinned: true,
                 leading: IconButton(
-                  icon: const Icon(Icons.arrow_back_ios, color: limeColor),
+                  icon: const Icon(Icons.arrow_back_ios, color: AppTheme.greenAccent),
                   onPressed: () => Navigator.pop(context),
                 ),
                 flexibleSpace: FlexibleSpaceBar(
@@ -252,9 +253,9 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(title,
-                          style: const TextStyle(fontSize: 26, color: Colors.white, fontWeight: FontWeight.bold)),
+                          style: const TextStyle(fontSize: 26, color: AppTheme.textWhite, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 6),
-                      Text(releaseYear, style: const TextStyle(color: Colors.white70)),
+                      Text(releaseYear, style: const TextStyle(color: AppTheme.textLight)),
                       const SizedBox(height: 20),
 
                       _playButton(() {
@@ -270,11 +271,11 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                       // Summary
                       const Text(
                         "Summary:",
-                        style: TextStyle(color: Colors.white54, fontSize: 16, fontWeight: FontWeight.w600),
+                        style: TextStyle(color: AppTheme.textGrey, fontSize: 16, fontWeight: FontWeight.w600),
                       ),
                       Text(
                         summary,
-                        style: const TextStyle(color: Colors.white, fontSize: 15, height: 1.4),
+                        style: const TextStyle(color: AppTheme.textWhite, fontSize: 15, height: 1.4),
                       ),
                       const SizedBox(height: 10),
 
@@ -283,7 +284,7 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                         onTap: () => setState(() => _showDescription = !_showDescription),
                         child: Text(
                           _showDescription ? "Hide description" : "Show description",
-                          style: const TextStyle(color: Colors.white54, fontSize: 14),
+                          style: const TextStyle(color: AppTheme.textGrey, fontSize: 14),
                         ),
                       ),
                       const SizedBox(height: 10),
@@ -291,7 +292,7 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                       if (_showDescription)
                         Text(
                           description,
-                          style: const TextStyle(color: Colors.white70, fontSize: 15, height: 1.4),
+                          style: const TextStyle(color: AppTheme.textLight, fontSize: 15, height: 1.4),
                         ),
 
                       // ⭐ INLINE FIELDS

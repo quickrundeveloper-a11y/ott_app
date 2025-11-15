@@ -26,7 +26,7 @@ class _SeriesDetailsState extends State<SeriesDetails>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 1, vsync: this);
     _dataFuture = _fetchVideoAndEpisodes();
   }
 
@@ -445,25 +445,15 @@ class _SeriesDetailsState extends State<SeriesDetails>
                         labelColor: Colors.white,
                         unselectedLabelColor: Colors.grey,
                         tabs: const [
-                          Tab(text: "Episodes"),
-                          Tab(text: "Collection"),
-                          Tab(text: "More Like This"),
-                          Tab(text: "Trailers & More"),
+                          Tab(text: "Episodes")
                         ],
                       ),
                     ),
                   ),
                 ];
               },
-              body: TabBarView(
-                controller: _tabController,
-                children: [
+              body:
                   _buildEpisodesList(episodes, seriesTitle),
-                  const Center(child: Text("Collection", style: TextStyle(color: Colors.white70))),
-                  const Center(child: Text("More Like This", style: TextStyle(color: Colors.white70))),
-                  const Center(child: Text("Trailers & More", style: TextStyle(color: Colors.white70))),
-                ],
-              ),
             ),
           ),
         );
