@@ -1,7 +1,8 @@
+// lib/screens/login_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-
 
 import '../theme/theme.dart';
 import 'auth_service.dart';
@@ -35,7 +36,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   /// ----------------------------------------------------------
-  /// NAVIGATION AFTER LOGIN / SIGNUP
+  /// NAVIGATION
   /// ----------------------------------------------------------
   Future<void> navigateAfter(User user, {bool newUser = false}) async {
     final uid = user.uid;
@@ -49,7 +50,6 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    // Check Firestore profile
     final exists = await _auth.profileExists(uid);
 
     if (exists) {
@@ -64,7 +64,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   /// ----------------------------------------------------------
-  /// STEP 1 : CHECK EMAIL → decide login OR signup
+  /// STEP 1 → CHECK EMAIL
   /// ----------------------------------------------------------
   Future<void> checkEmail() async {
     final email = emailC.text.trim();
@@ -88,15 +88,14 @@ class _LoginScreenState extends State<LoginScreen> {
       popup(existingUser
           ? "Existing user — enter password"
           : "New user — create password");
-    } catch (e) {
-      popup("Error checking email");
+
     } finally {
       setState(() => loading = false);
     }
   }
 
   /// ----------------------------------------------------------
-  /// STEP 2 : LOGIN OR SIGNUP FINAL ACTION
+  /// STEP 2 → LOGIN OR SIGNUP
   /// ----------------------------------------------------------
   Future<void> handleFinalSubmit() async {
     final email = emailC.text.trim();
@@ -115,13 +114,19 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => loading = true);
 
     try {
+      UserCredential cred;
+
       if (existingUser) {
-        final cred = await _auth.loginEmail(email, pass);
+        cred = await _auth.loginEmail(email, pass);
+        await _auth.saveLoginState(cred.user!.uid, cred.user!.email ?? "");
         await navigateAfter(cred.user!);
+
       } else {
-        final cred = await _auth.createEmail(email, pass);
+        cred = await _auth.createEmail(email, pass);
+        await _auth.saveLoginState(cred.user!.uid, cred.user!.email ?? "");
         await navigateAfter(cred.user!, newUser: true);
       }
+
     } catch (e) {
       popup(e.toString());
     } finally {
@@ -134,12 +139,11 @@ class _LoginScreenState extends State<LoginScreen> {
   /// ----------------------------------------------------------
   Future<void> handleGoogle() async {
     setState(() => loading = true);
-
     try {
       final cred = await _auth.loginGoogle();
+      await _auth.saveLoginState(cred.user!.uid, cred.user!.email ?? "");
       await navigateAfter(cred.user!);
-    } catch (e) {
-      popup("Google login failed");
+
     } finally {
       setState(() => loading = false);
     }
@@ -158,19 +162,15 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              /// Title
-              Text(
-                "Welcome !",
-                style: TextStyle(
-                  color: AppTheme.greenAccent,
-                  fontSize: 40,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
+              Text("Welcome !",
+                  style: TextStyle(
+                      color: AppTheme.greenAccent,
+                      fontSize: 40,
+                      fontWeight: FontWeight.w900)),
 
               const SizedBox(height: 30),
 
-              /// EMAIL FIELD
+              // EMAIL FIELD
               Container(
                 decoration: BoxDecoration(
                   color: AppTheme.cardDark,
@@ -189,9 +189,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
               const SizedBox(height: 20),
 
-              /// SHOW PASSWORD FIELDS ONLY AFTER "NEXT"
               if (showPasswordFields) ...[
-                // Password
+                // PASSWORD
                 Container(
                   decoration: BoxDecoration(
                     color: AppTheme.cardDark,
@@ -207,11 +206,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           : "Create Password",
                       suffix: IconButton(
                         icon: Icon(
-                          obscure
-                              ? Icons.visibility
-                              : Icons.visibility_off,
-                          color: Colors.white54,
-                        ),
+                            obscure
+                                ? Icons.visibility
+                                : Icons.visibility_off,
+                            color: Colors.white54),
                         onPressed: () =>
                             setState(() => obscure = !obscure),
                       ),
@@ -221,7 +219,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 const SizedBox(height: 20),
 
-                // Confirm password only for new users
                 if (!existingUser)
                   Container(
                     decoration: BoxDecoration(
@@ -236,11 +233,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         hint: "Confirm Password",
                         suffix: IconButton(
                           icon: Icon(
-                            obscureC
-                                ? Icons.visibility
-                                : Icons.visibility_off,
-                            color: Colors.white54,
-                          ),
+                              obscureC
+                                  ? Icons.visibility
+                                  : Icons.visibility_off,
+                              color: Colors.white54),
                           onPressed: () =>
                               setState(() => obscureC = !obscureC),
                         ),
@@ -251,7 +247,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
               const SizedBox(height: 25),
 
-              /// MAIN BUTTON (Next → Login/Create Account)
+              // MAIN BUTTON
               SizedBox(
                 width: double.infinity,
                 height: 55,
@@ -270,8 +266,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   child: loading
                       ? const CircularProgressIndicator(
-                    color: Colors.black,
-                  )
+                      color: Colors.black)
                       : Text(
                     !showPasswordFields
                         ? "NEXT"
@@ -279,21 +274,19 @@ class _LoginScreenState extends State<LoginScreen> {
                         ? "LOGIN"
                         : "CREATE ACCOUNT"),
                     style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1,
-                    ),
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1),
                   ),
                 ),
               ),
 
               const SizedBox(height: 20),
               const Center(
-                child: Text("OR",
-                    style: TextStyle(color: Colors.white54)),
-              ),
+                  child: Text("OR",
+                      style: TextStyle(color: Colors.white54))),
               const SizedBox(height: 20),
 
-              /// GOOGLE BUTTON
+              // GOOGLE LOGIN
               SizedBox(
                 width: double.infinity,
                 height: 55,
@@ -302,7 +295,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   style: OutlinedButton.styleFrom(
                     side: const BorderSide(color: Colors.white30),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14)),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
                   ),
                   icon: const Icon(Icons.account_circle_outlined,
                       color: Colors.white70),

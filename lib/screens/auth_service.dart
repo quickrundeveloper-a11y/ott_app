@@ -4,17 +4,27 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  // Your Google Web Client ID
   static const String googleWebClientId =
       "578839911643-mdjn5at4h5vrejrc09ig2d8d862lvnh1.apps.googleusercontent.com";
 
   /// ----------------------------------------------------------
-  /// CHECK IF EMAIL EXISTS IN FIREBASE AUTH
+  /// SAVE LOGIN STATE (VERY IMPORTANT)
+  /// ----------------------------------------------------------
+  Future<void> saveLoginState(String uid, String email) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString("uid", uid);
+    await prefs.setString("email", email);
+    await prefs.setBool("loggedIn", true);
+  }
+
+  /// ----------------------------------------------------------
+  /// CHECK EMAIL IN AUTH
   /// ----------------------------------------------------------
   Future<bool> userExistsByEmail(String email) async {
     try {
@@ -28,7 +38,7 @@ class AuthService {
   }
 
   /// ----------------------------------------------------------
-  /// EMAIL LOGIN
+  /// LOGIN EMAIL
   /// ----------------------------------------------------------
   Future<UserCredential> loginEmail(String email, String pass) async {
     return await _auth.signInWithEmailAndPassword(
@@ -58,13 +68,11 @@ class AuthService {
 
     final gUser = await googleSignIn.signIn();
     if (gUser == null) {
-      throw FirebaseAuthException(
-        code: "cancelled",
-        message: "Google Sign-in cancelled",
-      );
+      throw FirebaseAuthException(code: "cancelled");
     }
 
     final gAuth = await gUser.authentication;
+
     final cred = GoogleAuthProvider.credential(
       accessToken: gAuth.accessToken,
       idToken: gAuth.idToken,
@@ -74,7 +82,7 @@ class AuthService {
   }
 
   /// ----------------------------------------------------------
-  /// SAVE PROFILE (USED IN COMPLETE PROFILE)
+  /// SAVE PROFILE IN FIRESTORE
   /// ----------------------------------------------------------
   Future<void> saveProfile({
     required String uid,
@@ -92,7 +100,6 @@ class AuthService {
         "dob": dob.toIso8601String(),
         "gender": gender,
         if (email != null) "email": email,
-        "updatedAt": FieldValue.serverTimestamp(),
         "createdAt": FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
     } catch (e) {
@@ -102,7 +109,7 @@ class AuthService {
   }
 
   /// ----------------------------------------------------------
-  /// CHECK IF USER PROFILE EXISTS IN FIRESTORE
+  /// CHECK PROFILE EXISTS
   /// ----------------------------------------------------------
   Future<bool> profileExists(String uid) async {
     final doc = await _db.collection("users").doc(uid).get();
@@ -115,5 +122,7 @@ class AuthService {
   Future<void> logout() async {
     await FirebaseAuth.instance.signOut();
     await GoogleSignIn().signOut();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
   }
 }

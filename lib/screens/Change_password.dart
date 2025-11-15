@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:ott_app/screens/profile_screen.dart';
 
 import '../theme/theme.dart';
 
@@ -191,10 +192,20 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       await user.updatePassword(newPass.text.trim());
 
       showMessage("Password Updated Successfully!");
+
+      // 3️⃣ Redirect to Profile Page
+      Future.delayed(const Duration(milliseconds: 600), () {
+        if (mounted) {
+          Navigator.pop(context);
+
+        }
+      });
+
     } catch (e) {
       showMessage("Error: ${e.toString()}");
     }
   }
+
 
   void showMessage(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
