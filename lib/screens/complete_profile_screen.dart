@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import '../theme/theme.dart';
+import 'auth_service.dart';
 import 'home_screen.dart';
-import 'login_screen.dart';
+
+  // ✔ REQUIRED IMPORT (Fix)
 
 class CompleteProfileArgs {
   final String uid;
@@ -44,9 +47,12 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: Theme.of(context).colorScheme.copyWith(
-              primary: const Color(0xFFB6FF3B),
+            colorScheme: const ColorScheme.dark(
+              primary: AppTheme.greenAccent,
+              onPrimary: Colors.white,
+              surface: AppTheme.cardDark,
             ),
+            dialogBackgroundColor: AppTheme.cardDark,
           ),
           child: child!,
         );
@@ -57,9 +63,12 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate() || _dob == null) return;
+
     setState(() => _saving = true);
+
     try {
       final args = ModalRoute.of(context)!.settings.arguments as CompleteProfileArgs;
+
       await _authService.saveProfile(
         uid: args.uid,
         firstName: _first.text.trim(),
@@ -68,8 +77,11 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
         gender: _gender,
         email: args.email,
       );
+
       if (!mounted) return;
+
       Navigator.pushReplacementNamed(context, HomeScreen.route);
+
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
@@ -81,11 +93,13 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const lime = Color(0xFFB6FF3B);
     return Scaffold(
+      backgroundColor: AppTheme.background,
       appBar: AppBar(
-        title: const Text('Complete your Profile'),
-        backgroundColor: Colors.black,
+        title: const Text('Complete your Profile',
+            style: TextStyle(color: Colors.white)),
+        backgroundColor: AppTheme.background,
+        elevation: 0,
       ),
       body: SafeArea(
         child: Padding(
@@ -95,28 +109,47 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
             child: ListView(
               children: [
                 const Text('Tell us about you',
-                    style: TextStyle(color: lime, fontSize: 20, fontWeight: FontWeight.bold)),
+                    style: TextStyle(
+                        color: AppTheme.greenAccent,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold)),
                 const SizedBox(height: 18),
+
+                /// FIRST NAME
                 TextFormField(
                   controller: _first,
-                  decoration: const InputDecoration(hintText: 'First Name'),
-                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: AppTheme.inputDecoration(hint: 'First Name'),
+                  validator: (v) =>
+                  (v == null || v.trim().isEmpty) ? 'Required' : null,
                 ),
                 const SizedBox(height: 14),
+
+                /// LAST NAME
                 TextFormField(
                   controller: _last,
-                  decoration: const InputDecoration(hintText: 'Last Name'),
-                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: AppTheme.inputDecoration(hint: 'Last Name'),
+                  validator: (v) =>
+                  (v == null || v.trim().isEmpty) ? 'Required' : null,
                 ),
                 const SizedBox(height: 14),
+
+                /// DOB PICKER
                 InkWell(
                   onTap: _pickDob,
                   borderRadius: BorderRadius.circular(14),
-                  child: InputDecorator(
-                    decoration: const InputDecoration(hintText: 'Date of Birth'),
+                  child: Container(
+                    padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: AppTheme.borderColor),
+                      borderRadius: BorderRadius.circular(14),
+                      color: AppTheme.cardDark,
+                    ),
                     child: Text(
                       _dob == null
-                          ? 'Tap to choose'
+                          ? 'Date of Birth'
                           : '${_dob!.day.toString().padLeft(2, '0')}/'
                           '${_dob!.month.toString().padLeft(2, '0')}/'
                           '${_dob!.year}',
@@ -124,35 +157,43 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                     ),
                   ),
                 ),
+
                 const SizedBox(height: 14),
-                const Text('Gender', style: TextStyle(color: Colors.white70)),
+
+                /// GENDER SELECT
+                const Text('Gender',
+                    style: TextStyle(color: AppTheme.textLight)),
                 const SizedBox(height: 6),
+
                 Row(
                   children: [
                     Radio<String>(
                       value: 'male',
                       groupValue: _gender,
-                      activeColor: lime,
+                      activeColor: AppTheme.greenAccent,
                       onChanged: (v) => setState(() => _gender = v!),
                     ),
-                    const Text('Male'),
+                    const Text('Male', style: TextStyle(color: Colors.white)),
                     const SizedBox(width: 18),
                     Radio<String>(
                       value: 'female',
                       groupValue: _gender,
-                      activeColor: lime,
+                      activeColor: AppTheme.greenAccent,
                       onChanged: (v) => setState(() => _gender = v!),
                     ),
-                    const Text('Female'),
+                    const Text('Female', style: TextStyle(color: Colors.white)),
                   ],
                 ),
+
                 const SizedBox(height: 22),
+
+                /// SAVE BUTTON
                 SizedBox(
                   height: 54,
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: lime,
-                      foregroundColor: Colors.black,
+                      backgroundColor: AppTheme.greenAccent,
+                      foregroundColor: AppTheme.background,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
                       ),
@@ -160,11 +201,19 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                     onPressed: _saving ? null : _save,
                     child: _saving
                         ? const SizedBox(
-                        width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.black,
+                      ),
+                    )
                         : const Text('Save & Continue',
-                        style: TextStyle(fontWeight: FontWeight.w700)),
+                        style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1)),
                   ),
-                )
+                ),
               ],
             ),
           ),
